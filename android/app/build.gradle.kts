@@ -4,6 +4,7 @@ plugins {
     // START: FlutterFire Configuration
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
+    id("com.google.firebase.crashlytics")
 
     id("kotlin-android")
 
@@ -12,7 +13,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.driver_app"
+    namespace = "com.goouts.driver"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -27,7 +28,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID
-        applicationId = "com.example.driver_app"
+        applicationId = "com.goouts.driver"
 
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
