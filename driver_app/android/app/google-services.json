@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "289872853637",
+    "project_id": "goouts-f16db",
+    "storage_bucket": "goouts-f16db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289872853637:android:5b74a316b276c2715bc7ec",
+        "android_client_info": {
+          "package_name": "com.example.driver_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8x5e2Qbm5ccOHnSc4RJpLNQ57Bo3y0sk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

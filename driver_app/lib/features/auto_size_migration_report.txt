@@ -1,0 +1,38 @@
+AutoSizeText Migration Report
+============================================================
+Files changed   : 25
+Total replaced  : 176
+============================================================
+
+Changed files:
+  [  4 replacements]  business_referral_code_screen.dart
+  [ 12 replacements]  business_registration_screen.dart
+  [  5 replacements]  intro_slides_screen.dart
+  [  7 replacements]  login_screen.dart
+  [  4 replacements]  otp_verification_screen.dart
+  [  2 replacements]  referral_code_screen.dart
+  [ 15 replacements]  registration_screen.dart
+  [  3 replacements]  business_contact_info_section.dart
+  [  3 replacements]  contact_info_section.dart
+  [  1 replacements]  registration_section_card.dart
+  [ 13 replacements]  business_home_screen.dart
+  [ 15 replacements]  driver_home_screen.dart
+  [  2 replacements]  early_access_banner.dart
+  [  3 replacements]  faq_screen.dart
+  [  9 replacements]  terms_and_conditions_screen.dart
+  [  3 replacements]  business_messages_inbox_screen.dart
+  [  6 replacements]  message_detail_screen.dart
+  [  7 replacements]  messages_inbox_screen.dart
+  [  9 replacements]  business_profile_screen.dart
+  [  8 replacements]  driver_profile_screen.dart
+  [ 10 replacements]  business_referral_list_screen.dart
+  [ 10 replacements]  referral_dev_tester_screen.dart
+  [ 11 replacements]  referral_link_screen.dart
+  [ 10 replacements]  referral_list_screen.dart
+  [  4 replacements]  help_support_screen.dart
+
+Manual checks needed:
+  - Search for remaining `const Text(` in modified files
+  - Check button labels (ElevatedButton / OutlinedButton)
+  - Check SnackBar, Tooltip, Tab text widgets
+  - Check Text() inside AppBar title (usually fine as-is)
