@@ -1,6 +1,6 @@
 workflows:
 
-  # ─── GoOuts Driver App → TestFlight ────────────────────────────────────────
+  # ─── GoOuts Food Delivery Driver App → TestFlight ──────────────────────────
   goouts-driver-ios:
     name: GoOuts Driver App - TestFlight
     max_build_duration: 60
@@ -10,12 +10,11 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.goouts.driver
+      groups:
+        - appstore_credentials
       vars:
         BUNDLE_ID: com.goouts.driver
-        APP_NAME: GoOuts
+        APP_NAME: GoOuts Driver
 
     triggering:
       events:
@@ -38,80 +37,31 @@ workflows:
           cd ios
           pod install --repo-update
 
+      - name: Set up keychain
+        script: keychain initialize
+
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Add certs to keychain
+        script: keychain add-certificates
+
+      - name: Set up Xcode code signing
+        script: xcode-project use-profiles
+
       - name: Build iOS release
         script: |
           flutter build ipa \
             --release \
-            --build-number=$BUILD_NUMBER \
-            --export-options-plist=/Users/builder/export_options.plist
+            --build-number=$BUILD_NUMBER
 
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
-
-    publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
-        beta_groups:
-          - Investors
-      email:
-        recipients:
-          - mianamir74@gmail.com
-        notify:
-          success: true
-          failure: true
-
-  # ─── GoOuts Driver App → TestFlight ──────────────────────────────────────────
-  goouts-driver-ios:
-    name: GoOuts Driver App - TestFlight
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-
-    environment:
-      flutter: stable
-      xcode: latest
-      cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.goouts.driver
-      vars:
-        BUNDLE_ID: com.goouts.driver
-        APP_NAME: GoOuts Driver
-
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
-
-    scripts:
-      - name: Set build number
-        script: |
-          BUILD_NUMBER=$(date +%s)
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
-
-      - name: Get Flutter packages
-        script: flutter pub get
-
-      - name: Install CocoaPods
-        script: |
-          cd ios
-          pod install --repo-update
-
-      - name: Build iOS release
-        script: |
-          flutter build ipa \
-            --release \
-            --build-number=$BUILD_NUMBER \
-            --export-options-plist=/Users/builder/export_options.plist
-
-    artifacts:
-      - build/ios/ipa/*.ipa
 
     publishing:
       app_store_connect:
