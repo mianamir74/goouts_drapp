@@ -55,21 +55,22 @@ class AddressLookupService {
 
   // ─── Profile registration: postcode → address list ────────────────────────
 
-  /// One Mapbox Geocoding v6 call.
+  /// Mapbox Geocoding v5 call.
   /// Returns up to 10 real physical addresses for the given postcode.
   /// User picks one from a dropdown — no second call needed.
   Future<List<MapboxAddressResult>> validatePostcode(String postcode) async {
     final String normalised = normalise(postcode);
     try {
+      // Use Mapbox Geocoding v5 — works with any standard public token.
+      // v6 requires a special scope that may not be enabled on the token.
+      final String encoded = Uri.encodeComponent(normalised);
       final Uri uri = Uri.https(
         'api.mapbox.com',
-        '/search/geocode/v6/forward',
+        '/geocoding/v5/mapbox.places/$encoded.json',
         <String, String>{
-          'q': normalised,
-          'country': 'GB',
-          'types': 'address',   // real street addresses, not just postcode areas
+          'country': 'gb',
+          'types': 'address',
           'limit': '10',
-          'autocomplete': 'false',
           'access_token': _mapboxToken,
         },
       );
@@ -78,11 +79,14 @@ class AddressLookupService {
           await http.get(uri).timeout(const Duration(seconds: 10));
 
       developer.log(
-        'Mapbox postcode \${res.statusCode} for \$normalised',
+        'Mapbox v5 postcode ${res.statusCode} for $normalised',
         name: 'AddressLookup',
       );
 
-      if (res.statusCode < 200 || res.statusCode >= 300) return [];
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        developer.log('Mapbox error body: ${res.body}', name: 'AddressLookup');
+        return [];
+      }
 
       final Map<String, dynamic> decoded =
           jsonDecode(res.body) as Map<String, dynamic>;
@@ -92,9 +96,7 @@ class AddressLookupService {
 
       final List<MapboxAddressResult> results = [];
       for (final f in features) {
-        final feature = _asMap(f);
-        final props   = _asMap(feature['properties']);
-        final ctx     = _asMap(props['context']);
+        final feature  = _asMap(f);
         final geometry = _asMap(feature['geometry']);
         final coords   =
             (geometry['coordinates'] as List<dynamic>?) ?? <dynamic>[];
@@ -105,25 +107,27 @@ class AddressLookupService {
           lat = _toDouble(coords[1]);
         }
 
-        final addrCtx     = _asMap(ctx['address']);
-        final postcodeCtx = _asMap(ctx['postcode']);
-        final placeCtx    = _asMap(ctx['place']);
-        final countryCtx  = _asMap(ctx['country']);
+        // v5: house number is feature['address'], street is feature['text']
+        final houseNumber = _str(feature['address']);
+        final streetName  = _str(feature['text']);
+        final fullAddress = _str(feature['place_name']);
 
-        final houseNumber = _str(addrCtx['address_number']);
-        final street      = _str(addrCtx['street_name']);
-        final pc          = _str(postcodeCtx['name']).isNotEmpty
-            ? _str(postcodeCtx['name'])
-            : normalised;
-        final town        = _str(placeCtx['name']);
-        final country     = _str(countryCtx['name']);
+        // v5: context is a flat array — find entries by id prefix
+        String pc      = normalised;
+        String town    = '';
+        String country = '';
+        final List<dynamic> context =
+            (feature['context'] as List<dynamic>?) ?? <dynamic>[];
+        for (final c in context) {
+          final m    = _asMap(c);
+          final id   = _str(m['id']);
+          final text = _str(m['text']);
+          if (id.startsWith('postcode'))      pc      = text;
+          else if (id.startsWith('place'))    town    = text;
+          else if (id.startsWith('country'))  country = text;
+        }
 
-        final inferredCity =
-            inferCityFromPostcode(pc) ?? town;
-
-        final fullAddress = _str(props['full_address']).isNotEmpty
-            ? _str(props['full_address'])
-            : _str(props['name']);
+        final inferredCity = inferCityFromPostcode(pc) ?? town;
 
         if (fullAddress.isEmpty) continue;
 
@@ -135,14 +139,14 @@ class AddressLookupService {
           latitude: lat,
           longitude: lng,
           houseNumber: houseNumber.isNotEmpty ? houseNumber : null,
-          street: street.isNotEmpty ? street : null,
+          street: streetName.isNotEmpty ? streetName : null,
           country: country.isNotEmpty ? country : null,
         ));
       }
       return results;
     } catch (e, st) {
       developer.log(
-        'Mapbox error: \$e',
+        'Mapbox error: $e',
         name: 'AddressLookup',
         error: e,
         stackTrace: st,
