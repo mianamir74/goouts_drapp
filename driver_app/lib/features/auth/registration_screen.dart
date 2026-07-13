@@ -113,6 +113,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   // Locked only when address was actually auto-filled from OS bottom sheet.
   // Mapbox fallback / manual entry leave fields editable.
   bool _addressFieldsLocked = false;
+  List<MapboxAddressResult> _addressSuggestions = [];
 
   String _accountType = 'driver';
   AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
@@ -1028,7 +1029,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
-  /// Tapped when the user picks "Edit manually" / "Enter manually".
+  /// Called when the driver taps an address from the postcode dropdown.
+  void _onAddressSelected(MapboxAddressResult address) {
+    final String resolvedCountry = _inferCountryFromPostcode(address.postcode);
+    final List<String> cityOptions = AppLists.cityOptionsForCountry(resolvedCountry);
+    final String? inferredCity = AddressLookupService.inferCityFromPostcode(address.postcode);
+    final String? matchedCity = inferredCity != null
+        ? _matchCityOption(inferredCity, cityOptions)
+        : (address.city.isNotEmpty ? _matchCityOption(address.city, cityOptions) : null);
+    setState(() {
+      _postcodeController.text   = address.postcode;
+      _houseNoController.text    = address.houseNumber ?? '';
+      _streetNameController.text = address.street ?? '';
+      _townController.text       = (address.town ?? address.city).toUpperCase();
+      _selectedCountry           = resolvedCountry;
+      _selectedCity              = matchedCity;
+      _verifiedFullAddress       = address.fullAddress;
+      _verifiedLatitude          = address.latitude;
+      _verifiedLongitude         = address.longitude;
+      _isPostcodeVerified        = true;
+      _addressFieldsLocked       = false;
+      _addressSuggestions        = [];
+    });
+  }
+
+    /// Tapped when the user picks "Edit manually" / "Enter manually".
   /// Clears the verified state so the form fields unlock.
   void _handleEditManually() {
     setState(() {
@@ -2800,6 +2825,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           lockAddressFields: _addressFieldsLocked,
           onConfirmPostcode: _confirmPostcode,
           onEditManually: _handleEditManually,
+          addressSuggestions: _addressSuggestions,
+          onAddressSelected: _onAddressSelected,
           inputDecorationBuilder: _inputDecoration,
           upperCaseFormattersBuilder: _upperCaseFormatters,
           requiredValidator: _requiredValidator,
@@ -3042,4 +3069,95 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                   )
                 : AutoSizeText(
-                    'Co
+                    'Continue',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Already registered? ',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Log In',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0392CA),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: GestureDetector(
+            onTap: () => showPreAuthSupportSheet(
+              context,
+              accountType: 'driver',
+            ),
+            child: const Text(
+              'Having trouble? Get help',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.black38,
+                decoration: TextDecoration.underline,
+                decorationColor: Colors.black26,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.black87,
+            size: 20,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const AutoSizeText(
+          'Complete Registration',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Form(
+          key: _formKey,
+          autovalidateMode: _autoValidateMode,
+          child: _isBusinessAccount
+              ? _buildBusinessRegistrationBody()
+              : _buildDriverRegistrationBody(),
+        ),
+      ),
+    );
+  }
+}
+
+class ReferralDefaults {
+  static const String driverCode = 'GD100001';
+  static const String businessCode = 'GB000001';
+  static const String cabDriverCode = 'GC100001';
+}

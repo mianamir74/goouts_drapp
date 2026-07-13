@@ -130,6 +130,7 @@ class _BusinessRegistrationScreenState
   double? _verifiedLongitude;
   // Locked only when address was actually auto-filled from OS bottom sheet.
   bool _addressFieldsLocked = false;
+  List<MapboxAddressResult> _addressSuggestions = [];
 
   XFile? _selfieImage;
 
@@ -741,6 +742,31 @@ class _BusinessRegistrationScreenState
     if (mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
+  }
+
+  /// Called when the owner taps an address from the postcode dropdown (Mapbox path).
+  void _onAddressSelected(MapboxAddressResult address) {
+    final String resolvedCountry = _inferCountryFromPostcode(address.postcode);
+    final List<String> cityOptions =
+        _cityOptionsByCountry[resolvedCountry] ?? <String>[];
+    final String? inferredCity = AddressLookupService.inferCityFromPostcode(address.postcode);
+    final String? matchedCity = inferredCity != null
+        ? _matchCityOption(inferredCity, cityOptions)
+        : (address.city.isNotEmpty ? _matchCityOption(address.city, cityOptions) : null);
+    setState(() {
+      _postcodeController.text   = address.postcode;
+      _shopUnitNoController.text  = address.houseNumber ?? '';
+      _roadNameController.text    = address.street ?? '';
+      _townController.text       = (address.town ?? address.city).toUpperCase();
+      _selectedCountry           = resolvedCountry;
+      _selectedCity              = matchedCity;
+      _verifiedFullAddress       = address.fullAddress;
+      _verifiedLatitude          = address.latitude;
+      _verifiedLongitude         = address.longitude;
+      _isPostcodeVerified        = true;
+      _addressFieldsLocked       = false;
+      _addressSuggestions        = [];
+    });
   }
 
   /// Tapped when the owner picks "Edit manually". Clears verified state.
