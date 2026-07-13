@@ -2,6 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>GoOuts Driver needs camera access for delivery verification and document scanning.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GoOuts Driver needs access to your photo library to upload documents and profile photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>GoOuts Driver may save photos during document upload.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>GoOuts Driver uses your location to track deliveries and navigate to pickup and drop-off points.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>GoOuts Driver uses your location in the background to track active deliveries.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>GoOuts Driver uses Face ID to keep your account secure.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
