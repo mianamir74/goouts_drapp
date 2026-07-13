@@ -6,6 +6,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 import 'earnings_breakdown_screen.dart';
 import 'weekly_residual_summary_screen.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class EarningsScreen extends StatefulWidget {
   const EarningsScreen({super.key});
@@ -105,11 +106,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
   Future<void> _requestInstantPayout() async {
     if (_pendingPayout < 1.0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Minimum payout is £1.00'),
-            backgroundColor: Color(0xFF0b1a3d)),
-      );
+      GoOutsSheet.warning(context, title: 'Minimum Payout', message: 'Minimum payout is £1.00.');
       return;
     }
 
@@ -189,9 +186,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         _payoutLoading = false;
       });
       final net = result.data['netAmount'];
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+      GoOutsSheet.success(context, title: 'Transferred! 💸', message: 
             '✅ £${net?.toStringAsFixed(2)} transferred to your bank! Arrives within 30 mins.',
           ),
           backgroundColor: const Color(0xFF10b981),
@@ -202,9 +197,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _payoutLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Transfer failed: $e'),
+      GoOutsSheet.success(context, title: 'Transferred! 💸', message: 'Transfer failed: $e'),
           backgroundColor: const Color(0xFFef4444),
         ),
       );

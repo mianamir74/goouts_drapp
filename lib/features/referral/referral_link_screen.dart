@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../auth/models/driver_model.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class ReferralLinkScreen extends StatefulWidget {
   const ReferralLinkScreen({super.key});
@@ -443,11 +444,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
 
   void _showSnackBarMessage(String message) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    GoOutsSheet.info(context, title: 'GoOuts', message: message);
   }
 
   Future<bool> _launchWhatsAppToPhone({

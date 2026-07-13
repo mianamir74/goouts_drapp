@@ -409,17 +409,8 @@ class _BusinessReferralListScreenState extends State<BusinessReferralListScreen>
   }
 
   void _showSnackBar(String message) {
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    if (!mounted) return;
+    GoOutsSheet.warning(context, title: 'Attention', message: message);
   }
 
   _ReferralInviteItem _mapInviteDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {

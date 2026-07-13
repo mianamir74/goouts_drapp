@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/models/driver_model.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class ReferralDevTesterScreen extends StatefulWidget {
   const ReferralDevTesterScreen({super.key});
@@ -181,11 +182,7 @@ class _ReferralDevTesterScreenState extends State<ReferralDevTesterScreen> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    GoOutsSheet.info(context, title: 'GoOuts', message: message);
   }
 
   Future<void> _clearTesterScenarios(String userId) async {

@@ -337,12 +337,8 @@ class _MerchantOnboardingScreenState extends State<MerchantOnboardingScreen> {
   }
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(msg),
-        behavior: SnackBarBehavior.floating,
-      ));
+    if (!mounted) return;
+    GoOutsSheet.warning(context, title: 'Attention', message: msg);
   }
 
   void _showSuccessSheet() {

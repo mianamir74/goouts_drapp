@@ -24,6 +24,7 @@ import 'widgets/registration_section_card.dart';
 import 'widgets/vehicle_info_section.dart';
 import '../legal/terms_and_conditions_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 // NOTE:
 // This file is the user-requested updated copy of file:965 with these 4 changes:
@@ -421,10 +422,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   void _showSnackBarMessage(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    if (!mounted) return;
+    GoOutsSheet.warning(context, title: 'Attention', message: message);
   }
 
   Future<void> _showTermsRequiredDialog() async {

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../home/business_home_screen.dart';
 import '../home/driver_home_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String verificationId;
@@ -270,11 +271,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
             _resendToken = resendToken;
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('A new OTP has been sent.'),
-            ),
-          );
+          GoOutsSheet.info(context, title: 'Code Sent', message: 'A new OTP has been sent to your phone.');
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           if (!mounted) {

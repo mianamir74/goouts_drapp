@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../home/business_home_screen.dart';
 import '../legal/terms_and_conditions_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({
@@ -306,14 +307,8 @@ class _BusinessRegistrationScreenState
   }
 
   void _showSnackBarMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    if (!mounted) return;
+    GoOutsSheet.warning(context, title: 'Attention', message: message);
   }
 
   Future<void> _showTermsRequiredDialog() async {

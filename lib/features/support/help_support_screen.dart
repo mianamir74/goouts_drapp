@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'support_ticket_chat_screen.dart';
 import 'my_tickets_screen.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 // ── Category & sub-topic data ─────────────────────────────────────────────────
 
@@ -299,23 +300,17 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     FocusScope.of(context).unfocus();
 
     if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please select a category.'),
-        behavior: SnackBarBehavior.floating));
+      GoOutsSheet.warning(context, title: 'Required', message: 'Please select a category.');
       return;
     }
 
     if (_selectedCategory!.subTopics.isNotEmpty && _selectedSubTopic == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please select a sub-topic.'),
-        behavior: SnackBarBehavior.floating));
+      GoOutsSheet.warning(context, title: 'Required', message: 'Please select a sub-topic.');
       return;
     }
 
     if (_showCustomSubject && _customSubjectController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please describe your issue.'),
-        behavior: SnackBarBehavior.floating));
+      GoOutsSheet.warning(context, title: 'Required', message: 'Please describe your issue.');
       return;
     }
 
@@ -482,9 +477,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Failed to submit. Please try again.'),
-        behavior: SnackBarBehavior.floating));
+      GoOutsSheet.error(context, title: 'Submit Failed', message: 'Failed to submit. Please try again.');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

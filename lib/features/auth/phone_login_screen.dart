@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'auth_service.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class PhoneLoginScreen extends StatefulWidget {
   const PhoneLoginScreen({super.key});
@@ -56,9 +57,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
           _isLoading = false;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Phone verified automatically.')),
-        );
+        GoOutsSheet.success(context, title: 'Verified', message: 'Phone verified automatically.');
 
         context.go('/');
       },

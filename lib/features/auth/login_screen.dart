@@ -13,6 +13,7 @@ import 'referral_code_screen.dart';
 import 'business_referral_code_screen.dart';
 import 'widgets/pre_auth_support_sheet.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -308,11 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
               return;
             }
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Phone number verified successfully.'),
-              ),
-            );
+            GoOutsSheet.success(context, title: 'Verified', message: 'Phone number verified successfully.');
           } on FirebaseAuthException catch (e) {
             if (!mounted) {
               return;

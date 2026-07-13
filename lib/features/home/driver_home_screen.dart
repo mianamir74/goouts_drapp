@@ -17,6 +17,7 @@ import '../referral/referral_link_screen.dart';
 import '../referral/referral_list_screen.dart';
 import '../support/help_support_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -226,13 +227,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     Clipboard.setData(ClipboardData(text: referralCode));
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Referral code copied'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    GoOutsSheet.success(context, title: 'Copied!', message: 'Referral code copied to clipboard.');
   }
 
   Future<void> _logout() async {
@@ -266,13 +261,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   void _showComingSoon(String title) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('$title will be connected next.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      GoOutsSheet.info(context, title: 'Coming Soon', message: '$title will be connected next.');
   }
 
   void _openMenu({

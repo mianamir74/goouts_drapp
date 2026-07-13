@@ -1,6 +1,7 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 /// Standalone pre-authentication support bottom sheet.
 /// Used on Login and Registration screens — no uid required.
@@ -65,10 +66,7 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
 
   Future<void> _submit() async {
     if (_selectedTopic == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a topic.'),
-          behavior: SnackBarBehavior.floating));
+      GoOutsSheet.warning(context, title: 'Select Topic', message: 'Please select a topic.');
       return;
     }
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -132,10 +130,7 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
     } catch (_) {
       if (mounted) {
         setState(() => _submitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send. Please try again.'),
-            behavior: SnackBarBehavior.floating));
+        GoOutsSheet.error(context, title: 'Send Failed', message: 'Failed to send. Please try again.');
       }
     }
   }

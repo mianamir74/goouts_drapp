@@ -4,6 +4,7 @@ import 'package:gallery_saver_plus/gallery_saver.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import '../support/my_tickets_button.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class MessageDetailScreen extends StatefulWidget {
   final String userId;
@@ -75,14 +76,7 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    GoOutsSheet.info(context, title: 'GoOuts', message: message);
   }
 
   String _resolvedImageUrl() {
@@ -223,9 +217,9 @@ class _MessageDetailScreenState extends State<MessageDetailScreen> {
         final bool? result = await GallerySaver.saveImage(resolvedAttachmentUrl);
 
         if (result == true) {
-          _showSnackBar('Image saved to your phone.');
+          GoOutsSheet.success(context, title: 'Saved', message: 'Image saved to your phone.');
         } else {
-          _showSnackBar('Could not save image.');
+          GoOutsSheet.error(context, title: 'Save Failed', message: 'Could not save image.');
         }
       } else {
         final Uri uri = Uri.parse(resolvedAttachmentUrl);

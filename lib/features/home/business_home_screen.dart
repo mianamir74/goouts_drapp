@@ -15,6 +15,7 @@ import '../referral/referral_dev_tester_screen.dart';
 import '../support/help_support_screen.dart';
 import '../../main.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class BusinessHomeScreen extends StatefulWidget {
   const BusinessHomeScreen({super.key});
@@ -113,13 +114,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
 
   void _copyReferralCode(BuildContext context, String referralCode) {
     Clipboard.setData(ClipboardData(text: referralCode));
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Referral code copied'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    GoOutsSheet.success(context, title: 'Copied!', message: 'Referral code copied to clipboard.');
   }
 
   Future<void> _logout() async {
@@ -153,13 +148,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
 
   void _showComingSoon(String title) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('$title will be connected next.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      GoOutsSheet.info(context, title: 'Coming Soon', message: '$title will be connected next.');
   }
 
   void _openMenu(BuildContext context) {

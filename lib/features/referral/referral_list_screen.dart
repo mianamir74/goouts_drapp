@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 Future<String> _resolveDriverCollection(String uid) async {
   final firestore = FirebaseFirestore.instance;
@@ -151,13 +152,7 @@ class _ReferralListScreenState extends State<ReferralListScreen> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    GoOutsSheet.info(context, title: 'GoOuts', message: message);
   }
 
   Future<void> _sendReminder(

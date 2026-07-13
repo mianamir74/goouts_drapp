@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'active_delivery_screen.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class NewOrderOfferScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -66,9 +67,7 @@ class _NewOrderOfferScreenState extends State<NewOrderOfferScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Failed to accept order. Please try again.'),
-        backgroundColor: Colors.red[700],
+      GoOutsSheet.error(context, title: 'Accept Failed', message: 'Failed to accept order. Please try again.',
       ));
     }
   }

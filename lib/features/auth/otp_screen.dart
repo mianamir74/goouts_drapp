@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'auth_service.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class OtpScreen extends StatefulWidget {
   final String verificationId;
@@ -51,9 +52,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login successful.')),
-      );
+      GoOutsSheet.success(context, title: 'Welcome back!', message: 'You are now logged in.');
 
       context.go('/');
     } catch (e) {

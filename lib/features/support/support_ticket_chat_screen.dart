@@ -131,9 +131,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       _scrollToBottom();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send: $e'),
-            behavior: SnackBarBehavior.floating));
+        GoOutsSheet.error(context, title: 'Send Failed', message: 'Failed to send: $e');
       }
     }
     if (mounted) setState(() => _sending = false);
@@ -182,9 +180,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       await _sendMessage(imageUrl: url);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e'),
-            behavior: SnackBarBehavior.floating));
+        GoOutsSheet.error(context, title: 'Upload Failed', message: 'Upload failed: $e');
       }
     }
     if (mounted) setState(() => _uploading = false);
@@ -252,9 +248,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'),
-            behavior: SnackBarBehavior.floating));
+        GoOutsSheet.error(context, title: 'Error', message: 'Error: $e');
       }
     }
   }
@@ -435,10 +429,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Thank you for your feedback! ⭐'),
-            backgroundColor: Color(0xFF16A34A),
+        GoOutsSheet.success(context, title: 'Thank You! ⭐', message: 'Thank you for your feedback!',
             behavior: SnackBarBehavior.floating));
       }
     } catch (_) {}

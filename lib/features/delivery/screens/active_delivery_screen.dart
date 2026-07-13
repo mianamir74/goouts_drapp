@@ -10,6 +10,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../services/location_broadcast_service.dart';
 import 'delivery_verification_screen.dart';
 import 'food_delivery_chat_screen.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class ActiveDeliveryScreen extends StatefulWidget {
   final String orderId;
@@ -141,9 +142,7 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
   Future<void> _verifyPickupQR(String scannedOrderId) async {
     if (scannedOrderId.trim() != widget.orderId) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('QR does not match this order.'),
-        backgroundColor: Colors.red,
+      GoOutsSheet.error(context, title: 'Scan Error', message: 'QR does not match this order.',
       ));
       return;
     }
@@ -151,16 +150,12 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
       final fn = FirebaseFunctions.instanceFor(region: 'europe-west1');
       await fn.httpsCallable('verifyPickupQR').call({'orderId': widget.orderId});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Order picked up - confirmed!'),
-          backgroundColor: Color(0xFF10b981),
+        GoOutsSheet.success(context, title: 'Picked Up!', message: 'Order picked up — confirmed!',
         ));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Verification failed: ${e.toString()}'),
-        backgroundColor: Colors.red,
+      GoOutsSheet.error(context, title: 'Verification Failed', message: 'Verification failed: ${e.toString()}',
       ));
     }
   }
@@ -182,9 +177,7 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
       await _loc.stop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Failed to confirm delivery. Check connection.'),
-        backgroundColor: Colors.red[700],
+      GoOutsSheet.error(context, title: 'Delivery Failed', message: 'Failed to confirm delivery. Check your connection.',
       ));
     }
   }

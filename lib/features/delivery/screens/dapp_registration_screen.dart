@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'main_delivery_scaffold.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class DappRegistrationScreen extends StatefulWidget {
   const DappRegistrationScreen({super.key});
@@ -112,8 +113,8 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    if (!mounted) return;
+    GoOutsSheet.error(context, title: 'Error', message: msg);
   }
 
   @override
