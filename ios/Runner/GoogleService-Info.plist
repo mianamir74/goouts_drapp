@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>289872853637-hsn5qkb1g7fehvdelmc1rh18c847fame.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.289872853637-hsn5qkb1g7fehvdelmc1rh18c847fame</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>289872853637-5ar6lqio8idck3u6ldllf9114jkf4bde.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyD0u_n7kV2uPuSKFjaqYOyEiioDR5Y5d9o</string>
+	<key>GCM_SENDER_ID</key>
+	<string>289872853637</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.goouts.driver</string>
+	<key>PROJECT_ID</key>
+	<string>goouts-f16db</string>
+	<key>STORAGE_BUCKET</key>
+	<string>goouts-f16db.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:289872853637:ios:6061ccf0dec984b75bc7ec</string>
+	<key>DATABASE_URL</key>
+	<string>https://goouts-f16db-default-rtdb.europe-west1.firebasedatabase.app</string>
+</dict>
+</plist>
