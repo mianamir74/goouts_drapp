@@ -1,0 +1,73 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build-ios:
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    env:
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Codemagic CLI tools
+        run: pipx install codemagic-cli-tools
+
+      - name: Initialize keychain
+        run: keychain initialize
+
+      - name: Fetch iOS signing files (App Store)
+        run: |
+          app-store-connect fetch-signing-files com.goouts.driver \
+            --platform IOS \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+
+      - name: Add certificates to keychain
+        run: keychain add-certificates
+
+      - name: Apply provisioning profiles
+        run: xcode-project use-profiles
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Set build number
+        run: |
+          BUILD_NUM=$((500 + $GITHUB_RUN_NUMBER))
+          echo "iOS build number -> $BUILD_NUM"
+          cd ios && agvtool new-version -all "$BUILD_NUM"
+
+      - name: Build IPA
+        run: |
+          flutter build ipa \
+            --release \
+            --export-options-plist="$HOME/export_options.plist"
+
+      - name: Publish to TestFlight
+        run: |
+          app-store-connect publish \
+            --path build/ios/ipa/*.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoOuts-Food-Driver-ipa
+          path: build/ios/ipa/*.ipa

@@ -55,6 +55,12 @@ class DefaultFirebaseOptions {
     messagingSenderId: '289872853637',
     projectId: 'goouts-f16db',
     storageBucket: 'goouts-f16db.firebasestorage.app',
+    // CLIENT_ID from GoogleService-Info.plist — REQUIRED for Firebase Phone
+    // Auth reCAPTCHA fallback on iOS. Without it the native SDK throws an
+    // NSException (instant crash) when verifyPhoneNumber falls back to web
+    // verification, because it cannot resolve the registered URL scheme.
+    iosClientId:
+        '289872853637-hsn5qkb1g7fehvdelmc1rh18c847fame.apps.googleusercontent.com',
     iosBundleId: 'com.goouts.driver',
   );
 
