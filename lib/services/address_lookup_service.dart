@@ -1,16 +1,43 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
 /// GoOuts Address Lookup Service
 ///
-/// Strategy: user types postcode → tap "Look Up Postcode" → Mapbox validates
-/// it and returns city + coordinates in one call → city/country auto-fill →
-/// driver/owner types house number and street name manually.
+/// Two strategies, one token:
+///
+///  1. Postcode-only validation — confirms a postcode is real and returns
+///     city + coordinates in one call (used as a fallback / quick check).
+///
+///  2. Address autocomplete — free-text suggest() as the user types
+///     (postcode, house number, street...) with session tokens
+///     (suggest calls = FREE within session; only retrieve = 1 paid call).
+///     This is the PRIMARY flow — gives a real dropdown of matching
+///     addresses, no manual typing required unless nothing matches
+///     (e.g. a brand new build not yet in Mapbox's data).
 class AddressLookupService {
   static const String _mapboxToken =
       'pk.eyJ1IjoibWlhbmFtaXI3NCIsImEiOiJjbW44aGp1bTYwYzVrMnBxcnRvYzA5bG40In0.2thWcmSMupWuGVNKJmfQyg';
+
+  // ─── Session token ────────────────────────────────────────────────────────
+
+  /// Generates a UUID v4 to use as a Mapbox session token.
+  /// All suggest() calls sharing the same token are FREE.
+  /// Only the matching retrieve() call is billed (one session = one charge).
+  static String generateSessionToken() {
+    final r = Random.secure();
+    final bytes = List<int>.generate(16, (_) => r.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC variant
+    final hex =
+        bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
+  }
 
   // ─── Postcode helpers ────────────────────────────────────────────────────
 
@@ -30,7 +57,7 @@ class AddressLookupService {
     return cleaned.startsWith('BT');
   }
 
-  // ─── Mapbox postcode validation ──────────────────────────────────────────
+  // ─── Mapbox postcode validation (fallback / quick check) ─────────────────
 
   /// Validates a postcode via Mapbox and returns city + coordinates.
   /// Returns null if the postcode is not recognised.
@@ -103,6 +130,118 @@ class AddressLookupService {
         error: e,
         stackTrace: st,
       );
+      return null;
+    }
+  }
+
+  // ─── Address autocomplete: primary flow ───────────────────────────────────
+
+  /// Suggest addresses as the user types (postcode, house number, street...).
+  /// ALL calls sharing the same [sessionToken] are FREE — Mapbox bundles them.
+  /// Minimum 3 characters before firing.
+  Future<List<MapboxSuggestResult>> suggest(
+      String query, String sessionToken) async {
+    if (query.trim().length < 3) return [];
+    try {
+      final uri = Uri.https(
+        'api.mapbox.com',
+        '/search/searchbox/v1/suggest',
+        <String, String>{
+          'q': query,
+          'session_token': sessionToken,
+          'country': 'gb',
+          'limit': '6',
+          'language': 'en',
+          'types': 'address',
+          'access_token': _mapboxToken,
+        },
+      );
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (res.statusCode < 200 || res.statusCode >= 300) return [];
+
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      final suggestions =
+          (decoded['suggestions'] as List<dynamic>?) ?? <dynamic>[];
+
+      return suggestions.map((s) {
+        final m = _asMap(s);
+        final name = _str(m['name']);
+        final pf = _str(m['place_formatted']);
+        return MapboxSuggestResult(
+          mapboxId: _str(m['mapbox_id']),
+          name: name,
+          placeFormatted: pf,
+          fullAddress: '$name, $pf',
+        );
+      }).where((r) => r.mapboxId.isNotEmpty).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Retrieve full details for a selected suggestion.
+  /// This is the ONE paid call per address lookup.
+  /// Always generate a new session token after calling this.
+  Future<MapboxAddressResult?> retrieve(
+      String mapboxId, String sessionToken) async {
+    try {
+      final uri = Uri.https(
+        'api.mapbox.com',
+        '/search/searchbox/v1/retrieve/$mapboxId',
+        <String, String>{
+          'session_token': sessionToken,
+          'access_token': _mapboxToken,
+        },
+      );
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (res.statusCode < 200 || res.statusCode >= 300) return null;
+
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      final features =
+          (decoded['features'] as List<dynamic>?) ?? <dynamic>[];
+      if (features.isEmpty) return null;
+
+      final feature = _asMap(features.first);
+      final props = _asMap(feature['properties']);
+      final ctx = _asMap(props['context']);
+      final geometry = _asMap(feature['geometry']);
+      final coords =
+          (geometry['coordinates'] as List<dynamic>?) ?? <dynamic>[];
+
+      double? lng, lat;
+      if (coords.length >= 2) {
+        lng = _toDouble(coords[0]);
+        lat = _toDouble(coords[1]);
+      }
+
+      final addrCtx = _asMap(ctx['address']);
+      final postcodeCtx = _asMap(ctx['postcode']);
+      final placeCtx = _asMap(ctx['place']);
+      final countryCtx = _asMap(ctx['country']);
+
+      final houseNumber = _str(addrCtx['address_number']);
+      final street = _str(addrCtx['street_name']);
+      final postcode = _str(postcodeCtx['name']);
+      final town = _str(placeCtx['name']);
+      final country = _str(countryCtx['name']);
+      final inferredCity = inferCityFromPostcode(postcode) ?? town;
+
+      final fullAddress = _str(props['full_address']).isNotEmpty
+          ? _str(props['full_address'])
+          : _str(props['name']);
+
+      return MapboxAddressResult(
+        city: inferredCity,
+        town: town.isNotEmpty ? town : null,
+        fullAddress: fullAddress,
+        postcode: postcode,
+        latitude: lat,
+        longitude: lng,
+        houseNumber: houseNumber.isNotEmpty ? houseNumber : null,
+        street: street.isNotEmpty ? street : null,
+        country: country.isNotEmpty ? country : null,
+      );
+    } catch (_) {
       return null;
     }
   }
@@ -239,7 +378,7 @@ class AddressLookupService {
   }
 }
 
-/// Result from Mapbox postcode validation.
+/// Result from Mapbox postcode validation or retrieve().
 class MapboxAddressResult {
   const MapboxAddressResult({
     required this.city,
@@ -247,10 +386,17 @@ class MapboxAddressResult {
     required this.postcode,
     required this.latitude,
     required this.longitude,
+    this.houseNumber,
+    this.street,
+    this.town,
+    this.country,
   });
 
   /// Local area name from Mapbox (e.g. "Wembley", "Salford").
   final String city;
+
+  /// Local area / town from Mapbox context (e.g. "Wembley", "Salford").
+  final String? town;
 
   /// Full formatted address string from Mapbox.
   final String fullAddress;
@@ -258,6 +404,38 @@ class MapboxAddressResult {
   /// Normalised postcode (e.g. "HA9 9PT").
   final String postcode;
 
+  /// House / building number (e.g. "12").
+  final String? houseNumber;
+
+  /// Street / road name (e.g. "East Hill").
+  final String? street;
+
+  /// Country name (e.g. "United Kingdom").
+  final String? country;
+
   final double? latitude;
   final double? longitude;
+}
+
+/// Lightweight suggestion returned by suggest() — no coordinates yet.
+/// Call retrieve() with [mapboxId] to get full details.
+class MapboxSuggestResult {
+  const MapboxSuggestResult({
+    required this.mapboxId,
+    required this.name,
+    required this.placeFormatted,
+    required this.fullAddress,
+  });
+
+  /// Mapbox internal ID — pass to retrieve().
+  final String mapboxId;
+
+  /// Primary display name (e.g. "12 East Hill").
+  final String name;
+
+  /// Secondary display line (e.g. "London, SE18 2DP, United Kingdom").
+  final String placeFormatted;
+
+  /// Combined display string.
+  final String fullAddress;
 }
