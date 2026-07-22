@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../features/auth/auth_service.dart';
 import 'main_delivery_scaffold.dart';
@@ -31,6 +32,27 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
     for (final c in _ctrl) c.dispose();
     for (final f in _focus) f.dispose();
     super.dispose();
+  }
+
+  void _fillFromString(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.length < 6) return;
+    for (int i = 0; i < 6; i++) {
+      _ctrl[i].text = digits[i];
+    }
+    _focus[5].requestFocus();
+    setState(() {});
+    Future.delayed(const Duration(milliseconds: 150), _verify);
+  }
+
+  // Backspace pressed while a box is already empty — jump back to the
+  // previous box and clear it, so backspace works continuously without
+  // the user needing to manually tap each box.
+  void _handleBackspaceOnEmpty(int index) {
+    if (index <= 0) return;
+    _ctrl[index - 1].clear();
+    _focus[index - 1].requestFocus();
+    setState(() {});
   }
 
   Future<void> _verify() async {
@@ -93,9 +115,11 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
             ),
             const SizedBox(height: 40),
             // OTP boxes
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(6, (i) => _otpBox(i)),
+            AutofillGroup(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(6, (i) => _otpBox(i)),
+              ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 14),
@@ -144,11 +168,23 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
     return SizedBox(
       width: 46,
       height: 54,
-      child: TextField(
+      child: KeyboardListener(
+        focusNode: _focus[i],
+        onKeyEvent: (event) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.backspace &&
+              _ctrl[i].text.isEmpty) {
+            _handleBackspaceOnEmpty(i);
+          }
+        },
+        child: TextField(
         controller: _ctrl[i],
         focusNode: _focus[i],
         textAlign: TextAlign.center,
-        maxLength: 1,
+        // box 0 accepts 6 chars so SMS autofill / paste can insert the full
+        // code at once; _fillFromString then distributes it across all boxes
+        maxLength: i == 0 ? 6 : 1,
+        autofillHints: i == 0 ? const [AutofillHints.oneTimeCode] : null,
         keyboardType: TextInputType.number,
         style: const TextStyle(
             fontSize: 22,
@@ -173,13 +209,17 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
           ),
         ),
         onChanged: (val) {
+          if (val.length == 6) {
+            // Full paste OR SMS autofill into box 0 — distribute across all boxes
+            _fillFromString(val);
+            return;
+          }
           if (val.isNotEmpty && i < 5) {
             _focus[i + 1].requestFocus();
-          } else if (val.isEmpty && i > 0) {
-            _focus[i - 1].requestFocus();
           }
           if (i == 5 && val.isNotEmpty) _verify();
         },
+        ),
       ),
     );
   }

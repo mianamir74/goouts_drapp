@@ -217,11 +217,22 @@ class _ReferralCodeScreenState extends State<ReferralCodeScreen> {
       } else {
         _focusNodes[index].unfocus();
       }
+    }
+  }
+
+  // Backspace pressed while a box is already empty (nothing to delete in it) —
+  // jump back to the previous box and clear it, so the user can keep pressing
+  // backspace without having to manually tap each box.
+  void _handleBackspaceOnEmpty(int index) {
+    if (index <= 0) {
       return;
     }
-
-    if (index > 0) {
-      _focusNodes[index - 1].requestFocus();
+    _controllers[index - 1].clear();
+    _focusNodes[index - 1].requestFocus();
+    if (_errorText != null) {
+      setState(() {
+        _errorText = null;
+      });
     }
   }
 
@@ -358,6 +369,7 @@ class _ReferralCodeScreenState extends State<ReferralCodeScreen> {
             ? TextInputAction.done
             : TextInputAction.next,
         onChanged: (String value) => _handleCodeChanged(index, value),
+        onBackspaceEmpty: () => _handleBackspaceOnEmpty(index),
         onSubmitted: (_) {
           if (index == 7 && !_isLoading) {
             _handleContinue();
@@ -512,6 +524,7 @@ class _CodeInputBox extends StatelessWidget {
     required this.textInputAction,
     required this.onChanged,
     required this.onSubmitted,
+    this.onBackspaceEmpty,
   });
 
   final TextEditingController controller;
@@ -522,13 +535,24 @@ class _CodeInputBox extends StatelessWidget {
   final TextInputAction textInputAction;
   final ValueChanged<String> onChanged;
   final ValueChanged<String> onSubmitted;
+  final VoidCallback? onBackspaceEmpty;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 40,
       height: 56,
-      child: TextField(
+      child: KeyboardListener(
+        focusNode: focusNode,
+        onKeyEvent: (KeyEvent event) {
+          if (readOnly || onBackspaceEmpty == null) return;
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.backspace &&
+              controller.text.isEmpty) {
+            onBackspaceEmpty!();
+          }
+        },
+        child: TextField(
         controller: controller,
         focusNode: focusNode,
         readOnly: readOnly,
@@ -580,6 +604,7 @@ class _CodeInputBox extends StatelessWidget {
               width: 1.4,
             ),
           ),
+        ),
         ),
       ),
     );

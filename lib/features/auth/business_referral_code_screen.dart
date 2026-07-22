@@ -143,11 +143,17 @@ class _BusinessReferralCodeScreenState
       } else {
         _focusNodes[index].unfocus();
       }
-      return;
     }
+  }
 
-    if (index > 0) {
-      _focusNodes[index - 1].requestFocus();
+  // Backspace pressed while a box is already empty — jump back to the
+  // previous box and clear it, so backspace works continuously.
+  void _handleBackspaceOnEmpty(int index) {
+    if (index <= 0) return;
+    _controllers[index - 1].clear();
+    _focusNodes[index - 1].requestFocus();
+    if (_errorText != null) {
+      setState(() => _errorText = null);
     }
   }
 
@@ -187,7 +193,16 @@ class _BusinessReferralCodeScreenState
   return SizedBox(
     width: 40,
     height: 56,
-    child: TextField(
+    child: KeyboardListener(
+      focusNode: _focusNodes[index],
+      onKeyEvent: (KeyEvent event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.backspace &&
+            _controllers[index].text.isEmpty) {
+          _handleBackspaceOnEmpty(index);
+        }
+      },
+      child: TextField(
       controller: _controllers[index],
       focusNode: _focusNodes[index],
       keyboardType: TextInputType.text,
@@ -224,6 +239,7 @@ class _BusinessReferralCodeScreenState
         ),
       ),
       onChanged: (String value) => _handleCodeChanged(index, value),
+    ),
     ),
   );
 }
