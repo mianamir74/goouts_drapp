@@ -23,6 +23,13 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
   final List<TextEditingController> _ctrl =
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focus = List.generate(6, (_) => FocusNode());
+  // CRITICAL FIX: separate FocusNodes for the KeyboardListener wrappers — a
+  // FocusNode can only be attached to one widget at a time. Sharing one
+  // between the KeyboardListener and its TextField makes them fight over
+  // attaching it, looping unbounded and blowing memory until iOS kills the
+  // app. Same crash pattern as driver_app's referral code screen.
+  final List<FocusNode> _keyEventFocus =
+      List.generate(6, (_) => FocusNode(skipTraversal: true));
   final _authSvc = AuthService();
   bool   _loading = false;
   String? _error;
@@ -31,6 +38,7 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
   void dispose() {
     for (final c in _ctrl) c.dispose();
     for (final f in _focus) f.dispose();
+    for (final f in _keyEventFocus) f.dispose();
     super.dispose();
   }
 
@@ -169,7 +177,7 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
       width: 46,
       height: 54,
       child: KeyboardListener(
-        focusNode: _focus[i],
+        focusNode: _keyEventFocus[i],
         onKeyEvent: (event) {
           if (event is KeyDownEvent &&
               event.logicalKey == LogicalKeyboardKey.backspace &&

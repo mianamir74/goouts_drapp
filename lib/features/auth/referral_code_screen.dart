@@ -514,7 +514,7 @@ class _ReferralCodeScreenState extends State<ReferralCodeScreen> {
   }
 }
 
-class _CodeInputBox extends StatelessWidget {
+class _CodeInputBox extends StatefulWidget {
   const _CodeInputBox({
     required this.controller,
     required this.focusNode,
@@ -538,26 +538,56 @@ class _CodeInputBox extends StatelessWidget {
   final VoidCallback? onBackspaceEmpty;
 
   @override
+  State<_CodeInputBox> createState() => _CodeInputBoxState();
+}
+
+class _CodeInputBoxState extends State<_CodeInputBox> {
+  // CRITICAL FIX: KeyboardListener must NOT share the TextField's FocusNode.
+  // A FocusNode can only be attached to one widget at a time. Sharing one
+  // between the KeyboardListener and the TextField it wraps makes them fight
+  // over attaching it in the focus tree — each reattach fires a notification,
+  // rebuilds, and reattaches again, unbounded. With 8 boxes on screen this
+  // allocated multiple GB in seconds and got the app killed by iOS as
+  // out-of-memory (uncatchable kernel SIGKILL). Same crash as driver_app.
+  final FocusNode _keyEventFocusNode = FocusNode(
+    skipTraversal: true,
+    debugLabel: 'CodeInputBox key listener',
+  );
+
+  @override
+  void dispose() {
+    _keyEventFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final TextEditingController controller = widget.controller;
+    final FocusNode focusNode = widget.focusNode;
+    final bool readOnly = widget.readOnly;
+    final bool hasError = widget.hasError;
+    final String hintText = widget.hintText;
+    final VoidCallback? onBackspaceEmpty = widget.onBackspaceEmpty;
+
     return SizedBox(
       width: 40,
       height: 56,
       child: KeyboardListener(
-        focusNode: focusNode,
+        focusNode: _keyEventFocusNode,
         onKeyEvent: (KeyEvent event) {
           if (readOnly || onBackspaceEmpty == null) return;
           if (event is KeyDownEvent &&
               event.logicalKey == LogicalKeyboardKey.backspace &&
               controller.text.isEmpty) {
-            onBackspaceEmpty!();
+            onBackspaceEmpty();
           }
         },
         child: TextField(
         controller: controller,
         focusNode: focusNode,
         readOnly: readOnly,
-        onChanged: onChanged,
-        onSubmitted: onSubmitted,
+        onChanged: widget.onChanged,
+        onSubmitted: widget.onSubmitted,
         keyboardType: TextInputType.text,
         textCapitalization: TextCapitalization.characters,
         textAlign: TextAlign.center,

@@ -35,6 +35,16 @@ class _BusinessReferralCodeScreenState
     (_) => FocusNode(),
   );
 
+  // CRITICAL FIX: separate FocusNodes for the KeyboardListener wrappers — a
+  // FocusNode can only be attached to one widget at a time. Sharing one
+  // between the KeyboardListener and its TextField makes them fight over
+  // attaching it, looping unbounded and blowing memory until iOS kills the
+  // app. Same crash as driver_app. skipTraversal keeps these out of tab order.
+  final List<FocusNode> _keyEventFocusNodes = List<FocusNode>.generate(
+    8,
+    (_) => FocusNode(skipTraversal: true),
+  );
+
   bool _isLoading = false;
   String? _errorText;
 
@@ -56,6 +66,9 @@ class _BusinessReferralCodeScreenState
       controller.dispose();
     }
     for (final FocusNode focusNode in _focusNodes) {
+      focusNode.dispose();
+    }
+    for (final FocusNode focusNode in _keyEventFocusNodes) {
       focusNode.dispose();
     }
     super.dispose();
@@ -194,7 +207,7 @@ class _BusinessReferralCodeScreenState
     width: 40,
     height: 56,
     child: KeyboardListener(
-      focusNode: _focusNodes[index],
+      focusNode: _keyEventFocusNodes[index],
       onKeyEvent: (KeyEvent event) {
         if (event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.backspace &&
