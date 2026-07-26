@@ -1,3 +1,15 @@
 analyzer:
   exclude:
     - "**/*- Copy*.dart"
+    # A complete copy of the driver_app project is committed inside this repo
+    # at goouts_drapp/driver_app/ (236 tracked files). It is not part of this
+    # app's build — it was analysed alongside it and contributed 17 errors and
+    # several hundred lints that had nothing to do with goouts_drapp.
+    # Excluded here so reports reflect this app only. Worth deleting from the
+    # repo once someone confirms nothing references it.
+    - "driver_app/**"
+    - "backups/**"
+    - "**/backups/**"
+    - "**/*backup*/**"
+    - "**/*_old.dart"
+    - "build/**"
