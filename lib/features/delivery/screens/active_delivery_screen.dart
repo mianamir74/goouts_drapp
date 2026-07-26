@@ -5,7 +5,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+// mobile_scanner also exports a GeoPoint type, which clashes with the
+// cloud_firestore GeoPoint used throughout this screen for driver location.
+// Hide the scanner's version so GeoPoint unambiguously means Firestore's.
+import 'package:mobile_scanner/mobile_scanner.dart' hide GeoPoint;
 
 import '../../../services/location_broadcast_service.dart';
 import 'delivery_verification_screen.dart';
@@ -143,7 +146,7 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
     if (scannedOrderId.trim() != widget.orderId) {
       if (!mounted) return;
       GoOutsSheet.error(context, title: 'Scan Error', message: 'QR does not match this order.',
-      ));
+      );
       return;
     }
     try {
@@ -151,12 +154,12 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
       await fn.httpsCallable('verifyPickupQR').call({'orderId': widget.orderId});
       if (mounted) {
         GoOutsSheet.success(context, title: 'Picked Up!', message: 'Order picked up — confirmed!',
-        ));
+        );
       }
     } catch (e) {
       if (!mounted) return;
       GoOutsSheet.error(context, title: 'Verification Failed', message: 'Verification failed: ${e.toString()}',
-      ));
+      );
     }
   }
 
@@ -178,7 +181,7 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
     } catch (e) {
       if (!mounted) return;
       GoOutsSheet.error(context, title: 'Delivery Failed', message: 'Failed to confirm delivery. Check your connection.',
-      ));
+      );
     }
   }
 
@@ -648,4 +651,105 @@ class _QrScanSheet extends StatefulWidget {
   const _QrScanSheet({required this.onScanned});
 
   @override
-  State<_QrScanSheet> createState() => _QrScanSheetStat
+  @override
+  State<_QrScanSheet> createState() => _QrScanSheetState();
+}
+
+class _QrScanSheetState extends State<_QrScanSheet> {
+  // RECONSTRUCTED: the file was truncated mid-word here, so this State class
+  // was missing entirely and the app could not compile. _QrScanSheet is used
+  // by _openQrScanner() to scan the pickup QR on a food order.
+  final MobileScannerController _controller = MobileScannerController();
+  bool _handled = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    // Guard against the scanner firing repeatedly for the same code.
+    if (_handled) return;
+    final String raw = capture.barcodes.isNotEmpty
+        ? (capture.barcodes.first.rawValue ?? '')
+        : '';
+    final String code = raw.trim();
+    if (code.isEmpty) return;
+
+    _handled = true;
+    _controller.stop();
+    widget.onScanned(code);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double height = MediaQuery.of(context).size.height * 0.72;
+
+    return Container(
+      height: height,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0B1620),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.qr_code_scanner_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Scan pickup QR',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: MobileScanner(
+                  controller: _controller,
+                  onDetect: _onDetect,
+                ),
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 14, 24, 24),
+            child: Text(
+              'Point the camera at the QR code on the order.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70, fontSize: 12.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

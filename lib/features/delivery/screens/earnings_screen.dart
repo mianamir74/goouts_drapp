@@ -186,20 +186,22 @@ class _EarningsScreenState extends State<EarningsScreen> {
         _payoutLoading = false;
       });
       final net = result.data['netAmount'];
-      GoOutsSheet.success(context, title: 'Transferred! 💸', message: 
-            '✅ £${net?.toStringAsFixed(2)} transferred to your bank! Arrives within 30 mins.',
-          ),
-          backgroundColor: const Color(0xFF10b981),
-          duration: const Duration(seconds: 4),
-        ),
+      GoOutsSheet.success(
+        context,
+        title: 'Transferred! 💸',
+        message:
+            '£${net?.toStringAsFixed(2)} transferred to your bank. Arrives within 30 mins.',
       );
       _load(); // refresh balances
     } catch (e) {
       if (!mounted) return;
       setState(() => _payoutLoading = false);
-      GoOutsSheet.success(context, title: 'Transferred! 💸', message: 'Transfer failed: $e'),
-          backgroundColor: const Color(0xFFef4444),
-        ),
+      // Was GoOutsSheet.success titled 'Transferred!' on the FAILURE path,
+      // and terminated with ',' instead of ';'.
+      GoOutsSheet.error(
+        context,
+        title: 'Transfer Failed',
+        message: 'Transfer failed: $e',
       );
     }
   }

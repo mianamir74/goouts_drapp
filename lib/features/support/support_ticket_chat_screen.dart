@@ -430,7 +430,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
 
       if (mounted) {
         GoOutsSheet.success(context, title: 'Thank You! ⭐', message: 'Thank you for your feedback!',
-            behavior: SnackBarBehavior.floating));
+            behavior: SnackBarBehavior.floating);
       }
     } catch (_) {}
   }

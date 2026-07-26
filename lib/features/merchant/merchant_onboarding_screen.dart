@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../auth/utils/app_lists.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class MerchantOnboardingScreen extends StatefulWidget {
   const MerchantOnboardingScreen({super.key});

@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../main.dart'; // for RoleIntroSlidesScreen
+// (main.dart import removed — it was only here for RoleIntroSlidesScreen,
+// which is driver_app's class and never existed in this app.)
+import '../auth/intro_slides_screen.dart';
 import '../auth/login_screen.dart';
 import '../legal/faq_screen.dart';
 import '../legal/terms_and_conditions_screen.dart';
@@ -260,8 +262,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   void _showComingSoon(String title) {
-    ScaffoldMessenger.of(context)
-      GoOutsSheet.info(context, title: 'Coming Soon', message: '$title will be connected next.');
+    // Orphaned 'ScaffoldMessenger.of(context)' left behind by the snackbar
+    // rewrite, with no statement terminator.
+    GoOutsSheet.info(
+      context,
+      title: 'Coming Soon',
+      message: '$title will be connected next.',
+    );
   }
 
   void _openMenu({
@@ -331,14 +338,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   title: 'Intro Slides',
                   onTap: () {
                     Navigator.pop(sheetContext);
+                    // Was RoleIntroSlidesScreen(accountType:, openedFromMenu:)
+                    // — driver_app's class, which does not exist here.
                     Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const RoleIntroSlidesScreen(
-                      accountType: 'driver',
-                      openedFromMenu: true,
-                  ),
-                ),
-               );
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const IntroSlidesScreen(role: 'driver'),
+                      ),
+                    );
               },
             ),
 

@@ -143,7 +143,10 @@ class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
                                 Text(
                                     'Call 999 • Say "Hey GoOuts, Emergency"',
                                     style: TextStyle(
-                                        color: Colors.white80,
+                                        // Colors.white80 does not exist —
+                                        // the Material palette goes
+                                        // white70 -> white60 -> white54...
+                                        color: Colors.white70,
                                         fontSize: 13)),
                               ],
                             ),

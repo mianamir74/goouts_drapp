@@ -68,7 +68,7 @@ class _NewOrderOfferScreenState extends State<NewOrderOfferScreen>
       if (!mounted) return;
       setState(() => _loading = false);
       GoOutsSheet.error(context, title: 'Accept Failed', message: 'Failed to accept order. Please try again.',
-      ));
+      );
     }
   }
 

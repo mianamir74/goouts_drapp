@@ -12,4 +12,6 @@ analyzer:
     - "**/backups/**"
     - "**/*backup*/**"
     - "**/*_old.dart"
+    - "**/*.BACKUP.dart"
+    - "**/*.bak.dart"
     - "build/**"

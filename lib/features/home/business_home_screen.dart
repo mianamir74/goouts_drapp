@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../auth/intro_slides_screen.dart';
 import '../auth/login_screen.dart';
 import '../legal/terms_and_conditions_screen.dart';
 import '../messages/business_messages_inbox_screen.dart';
@@ -13,7 +14,8 @@ import '../referral/business_referral_link_screen.dart';
 import '../referral/business_referral_list_screen.dart';
 import '../referral/referral_dev_tester_screen.dart';
 import '../support/help_support_screen.dart';
-import '../../main.dart';
+// (main.dart import removed — it was only here for RoleIntroSlidesScreen,
+// which is driver_app's class and never existed in this app.)
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
@@ -147,8 +149,13 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
   }
 
   void _showComingSoon(String title) {
-    ScaffoldMessenger.of(context)
-      GoOutsSheet.info(context, title: 'Coming Soon', message: '$title will be connected next.');
+    // The snackbar rewrite left the orphaned 'ScaffoldMessenger.of(context)'
+    // line above the new call, with no statement terminator.
+    GoOutsSheet.info(
+      context,
+      title: 'Coming Soon',
+      message: '$title will be connected next.',
+    );
   }
 
   void _openMenu(BuildContext context) {
@@ -214,13 +221,13 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                 title: 'Intro Slides',
                  onTap: () {
                     Navigator.pop(sheetContext);
+                    // Was RoleIntroSlidesScreen(accountType:, openedFromMenu:),
+                    // which is driver_app's class — it does not exist in this
+                    // app. goouts_drapp's equivalent is IntroSlidesScreen(role:).
                     _openScreen(
-                    context,
-                    RoleIntroSlidesScreen(
-                    accountType: 'business',
-                    openedFromMenu: true,
-                ),
-               );
+                      context,
+                      const IntroSlidesScreen(role: 'business'),
+                    );
               },
             ),
               _menuTile(

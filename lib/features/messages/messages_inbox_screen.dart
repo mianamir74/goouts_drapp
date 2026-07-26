@@ -738,17 +738,19 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
             messageId: message.id,
           );
           if (context.mounted) {
-            GoOutsSheet.info(context, title: 'Archived', message: 'Message archived.',
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                action: SnackBarAction(
-                  label: 'Undo',
-                  textColor: Colors.white,
-                  onPressed: () => _unarchiveMessage(
-                    collection: account.collection,
-                    userId: account.uid,
-                    messageId: message.id,
-                  ),
-                ),
+            // The snackbar->GoOutsSheet rewrite left the old SnackBar's
+            // arguments (shape:, action: SnackBarAction) inside this call,
+            // which broke the file. GoOutsSheet has its own actionLabel/
+            // onAction pair, so the Undo is preserved rather than dropped.
+            GoOutsSheet.info(
+              context,
+              title: 'Archived',
+              message: 'Message archived.',
+              actionLabel: 'Undo',
+              onAction: () => _unarchiveMessage(
+                collection: account.collection,
+                userId: account.uid,
+                messageId: message.id,
               ),
             );
           }
@@ -760,9 +762,10 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
             messageId: message.id,
           );
           if (context.mounted) {
-            GoOutsSheet.error(context, title: 'Deleted', message: 'Message deleted.',
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
+            GoOutsSheet.info(
+              context,
+              title: 'Deleted',
+              message: 'Message deleted.',
             );
           }
         }
