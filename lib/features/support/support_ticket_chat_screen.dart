@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:auto_size_text/auto_size_text.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 class SupportTicketChatScreen extends StatefulWidget {
   final String ticketId;
