@@ -684,7 +684,7 @@ class _MerchantOnboardingScreenState extends State<MerchantOnboardingScreen> {
                         value: _acceptsDelivery,
                         onChanged: (v) =>
                             setState(() => _acceptsDelivery = v),
-                        activeColor: _blue,
+                        activeThumbColor: _blue,
                       ),
                     ],
                   ),
@@ -808,7 +808,7 @@ class _MerchantOnboardingScreenState extends State<MerchantOnboardingScreen> {
                                 value: _socialBoostOptIn,
                                 onChanged: (v) =>
                                     setState(() => _socialBoostOptIn = v),
-                                activeColor: const Color(0xFF7C3AED),
+                                activeThumbColor: const Color(0xFF7C3AED),
                               ),
                             ],
                           ),

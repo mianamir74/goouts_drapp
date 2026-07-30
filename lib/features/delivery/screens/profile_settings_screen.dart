@@ -272,7 +272,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                     Switch(
                       value: themeProvider.isLight,
                       onChanged: themeProvider.toggle,
-                      activeColor: const Color(0xFF0392ca),
+                      activeThumbColor: const Color(0xFF0392ca),
                     ),
                   ]),
                   const SizedBox(height: 4),
