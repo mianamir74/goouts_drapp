@@ -185,6 +185,17 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
     }
   }
 
+  /// Placeholder tile used when the restaurant has no usable image.
+  ///
+  /// Shared by the empty check and the errorBuilder so both paths render the
+  /// same thing.
+  Widget _restaurantImageFallback() => Container(
+        width: 50,
+        height: 50,
+        color: const Color(0xFF031134),
+        child: const Icon(Icons.restaurant, color: Color(0xFF0392ca)),
+      );
+
   @override
   Widget build(BuildContext context) {
     if (_order == null) {
@@ -386,14 +397,20 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: restImageUrl != null
+                              // isNotEmpty matters as much as the null check:
+                              // Firestore stores a missing image as "" far
+                              // more often than as null, and Image.network("")
+                              // throws. errorBuilder covers a URL that is set
+                              // but unreachable.
+                              child: (restImageUrl != null &&
+                                      restImageUrl.trim().isNotEmpty)
                                   ? Image.network(restImageUrl,
-                                      width: 50, height: 50, fit: BoxFit.cover)
-                                  : Container(
                                       width: 50,
                                       height: 50,
-                                      color: const Color(0xFF031134),
-                                      child: const Icon(Icons.restaurant, color: Color(0xFF0392ca))),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          _restaurantImageFallback())
+                                  : _restaurantImageFallback(),
                             ),
                             const SizedBox(width: 12),
                             Expanded(

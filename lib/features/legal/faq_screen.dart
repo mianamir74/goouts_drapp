@@ -3,106 +3,356 @@ import 'package:flutter/material.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAQ Screen
+// FAQ Screen  —  GoOuts Delivery Driver
 //
-// Loads FAQ items from Firestore `faq` collection (field: question, answer,
-// order, isActive). Falls back to hardcoded defaults when the collection is
-// empty or unavailable. Add / edit / delete entries from the Admin Panel.
+// Loads FAQ items from Firestore collection `delivery_driver_faqs`.
+// Fields: question, answer, category, order, isActive.
+// Falls back to the hardcoded defaults below when the collection is empty or
+// unreachable. Managed from Admin Panel → Driver FAQs → Delivery Driver.
+//
+// IMPORTANT: this app previously read a collection called `faq`, which it
+// shared with the GoOuts Lead enrolment app, and therefore showed enrolment
+// and early access answers to working delivery drivers. The two apps now use
+// separate collections. The collection name and the `isActive` field name must
+// stay in step with _DriverFaqsPage in admin_panel/lib/admin_dashboard.dart.
 // ─────────────────────────────────────────────────────────────────────────────
+
+const String kDeliveryDriverFaqCollection = 'delivery_driver_faqs';
 
 class FaqScreen extends StatelessWidget {
   const FaqScreen({super.key});
 
   static const Color _goOutsBlue = Color(0xFF0392CA);
 
-  // ── Hardcoded fallback FAQs (shown when Firestore collection is empty) ──────
+  /// Category display order. Anything not listed is appended at the end.
+  static const List<String> _categoryOrder = [
+    'Getting Started',
+    'Deliveries',
+    'Earnings',
+    'Residual Income',
+    'Referrals',
+    'Safety',
+    'Account',
+  ];
+
+  // ── Hardcoded fallback FAQs ────────────────────────────────────────────────
+  // Screen names below match the real app: Trip Radar, the dashboard heatmap,
+  // the safety toolkit, the earnings breakdown and the weekly residual summary.
   static const List<_FaqItem> _defaults = [
+    // ── Getting Started ──────────────────────────────────────────────────────
     _FaqItem(
-      question: 'What is GoOuts?',
+      category: 'Getting Started',
+      question: 'What do I need before I can start delivering?',
       answer:
-          'GoOuts is a pre-launch lead generation platform connecting delivery drivers, '
-          'rider drivers, and business partners across the United Kingdom and Northern Ireland. '
-          'Register now to secure your place ahead of the official launch.',
+          'A verified GoOuts driver account, a valid identity document, the '
+          'right to work in the United Kingdom, and the correct insurance for '
+          'the vehicle you will be using. Once your documents are approved you '
+          'can go online and start receiving orders.',
     ),
     _FaqItem(
-      question: 'Is GoOuts live yet?',
+      category: 'Getting Started',
+      question: 'How do I go online and start receiving orders?',
       answer:
-          'GoOuts is currently in its pre-launch phase. No live deliveries or commercial '
-          'transactions take place within the app at this time. Early registrants will receive '
-          'priority access and notifications when GoOuts goes live in their area.',
+          'Open the app and switch yourself online from your dashboard. Nearby '
+          'order offers then come through automatically. Tap an offer to see the '
+          'pickup, the delivery address and exactly what you will be paid before '
+          'you decide whether to accept it.',
     ),
     _FaqItem(
-      question: 'How do I register as a Delivery Driver?',
+      category: 'Getting Started',
+      question: 'What is Trip Radar?',
       answer:
-          'Open the app and select "Delivery Driver" on the role selection screen. '
-          'Complete your personal details, upload your selfie and identity documents, '
-          'and submit your registration. Our team will review and approve your profile.',
+          'Trip Radar shows you where orders are being placed around you in real '
+          'time. Use it to position yourself close to busy restaurants instead '
+          'of waiting in a quiet area.',
     ),
     _FaqItem(
-      question: 'How do I register as a Rider Driver?',
+      category: 'Getting Started',
+      question: 'What is the heatmap on my dashboard?',
       answer:
-          'Select "Rider Driver" on the role selection screen and follow the registration '
-          'steps. You will need to provide personal details, a selfie, and valid identity '
-          'documents to complete your profile.',
+          'The heatmap shades the areas with the most order activity at that '
+          'moment. Warmer colours mean higher demand, so moving towards them '
+          'usually means shorter waits between jobs.',
+    ),
+
+    // ── Deliveries ───────────────────────────────────────────────────────────
+    _FaqItem(
+      category: 'Deliveries',
+      question: 'Can I see what an order pays before I accept it?',
+      answer:
+          'Yes, always. Every offer shows the pickup location, the delivery '
+          'address, the distance and your total payment before you accept. You '
+          'are never asked to commit to a job without knowing what it pays.',
     ),
     _FaqItem(
-      question: 'How do I register as a Business Partner?',
+      category: 'Deliveries',
+      question: 'What happens if I decline an order?',
       answer:
-          'Select "Business Partner" on the role selection screen. You will be asked to '
-          'provide your business name, company number, business address, and supporting '
-          'documents. Once submitted, your account will be reviewed by our team.',
+          'Nothing at all. Declining an offer does not affect your account, your '
+          'rating or the orders you are shown next. If a job does not work for '
+          'you, let it go and wait for the following one.',
     ),
     _FaqItem(
-      question: 'What is the referral programme?',
+      category: 'Deliveries',
+      question: 'The restaurant is not ready. What should I do?',
       answer:
-          'Every registered user receives a unique referral code. Share it with friends '
-          'and contacts — when they register using your code, they are linked to your '
-          'network. You can track who has joined, who is still pending, and grow your '
-          'portfolio directly from the My Referrals section.',
+          'Stay at the venue and mark the order as waiting in the app so support '
+          'can see the delay. Message the customer through the in app chat to '
+          'let them know. Never leave without the food, and never mark an order '
+          'as collected before it is actually in your hands.',
     ),
     _FaqItem(
-      question: 'How much can I earn through referrals?',
+      category: 'Deliveries',
+      question: 'How do I confirm that I have collected the order?',
       answer:
-          'GoOuts operates a residual income model. You can earn up to 5% from the earnings '
-          'of drivers you refer. Full earnings details will be confirmed at launch. '
-          'The more drivers you bring in before launch, the larger your network will be '
-          'from day one.',
+          'Scan the order code shown by the restaurant, or enter the pickup code '
+          'manually if scanning is not possible. This starts the delivery leg '
+          'and begins sharing your live location with the customer waiting for '
+          'the order.',
     ),
     _FaqItem(
-      question: 'Why do I need to upload identity documents?',
+      category: 'Deliveries',
+      question: 'How do I complete a delivery?',
       answer:
-          'Identity verification is a legal and compliance requirement. We collect a selfie '
-          'and government-issued ID (passport or driving licence) to confirm your identity '
-          'and right to work. Your documents are stored securely and are never shared with '
-          'third parties except where required by law.',
+          'Follow the confirmation method shown on the order screen. Depending '
+          'on the delivery that is a photo of where you left the food, a code '
+          'read out by the customer, or a signature. Complete that step in the '
+          'app before you leave, otherwise the order stays open.',
     ),
     _FaqItem(
-      question: 'How do I send a reminder to a pending referral?',
+      category: 'Deliveries',
+      question: 'The customer is not answering. What should I do?',
       answer:
-          'Go to My Referrals, find the person with a Pending status, and tap the '
-          '"Send Reminder" button. This will open WhatsApp with a pre-filled reminder '
-          'message addressed to that person so you can send it in one tap.',
+          'Call and message the customer through the app first. If there is '
+          'still no answer, wait for the time shown on the order screen and then '
+          'follow the prompt to report the delivery as failed. Do not leave food '
+          'unattended unless the customer has asked for it to be left somewhere '
+          'specific.',
     ),
     _FaqItem(
-      question: 'What does "Joined Elsewhere" mean?',
+      category: 'Deliveries',
+      question: 'Can I cancel a delivery after I have accepted it?',
       answer:
-          '"Joined Elsewhere" means the person you invited completed their registration '
-          'but used a different referral code. They are no longer linked to your referral '
-          'network.',
+          'You can, but please only do so when you genuinely cannot finish the '
+          'job, for example a breakdown or a safety concern. Use the cancel '
+          'option on the delivery screen so the order can be reassigned quickly, '
+          'and tell support what happened.',
     ),
     _FaqItem(
-      question: 'How do I reset my password?',
+      category: 'Deliveries',
+      question: 'Something is missing from the order. Am I responsible?',
       answer:
-          'On the login screen tap "Forgot Password?" and enter your registered email '
-          'address. You will receive a password reset link by email. If you registered '
-          'using your phone number only, contact support at support@goouts.app.',
+          'No. Sealed bags are the restaurant’s responsibility and you are not '
+          'expected to check their contents. Report the problem in the app so we '
+          'can log it against the venue, and never open a sealed order.',
+    ),
+
+    // ── Earnings ─────────────────────────────────────────────────────────────
+    _FaqItem(
+      category: 'Earnings',
+      question: 'How is my payment for each delivery calculated?',
+      answer:
+          'Each job is priced from the distance, the expected time and the '
+          'current demand in that area. The full amount is shown on the offer '
+          'before you accept, so there are no surprises afterwards.',
     ),
     _FaqItem(
-      question: 'How do I contact GoOuts support?',
+      category: 'Earnings',
+      question: 'Do I keep all of my tips?',
       answer:
-          'You can reach us through the Help & Support section in the app menu, or '
-          'email us directly at support@goouts.app. We aim to respond within 24 hours '
-          'on business days.',
+          'Yes. One hundred percent of every tip goes to you. GoOuts does not '
+          'take a share of tips and they are listed separately in your earnings '
+          'breakdown so you can always see them.',
+    ),
+    _FaqItem(
+      category: 'Earnings',
+      question: 'Where can I see what I have earned?',
+      answer:
+          'Your earnings screen shows what you have made today, this week and in '
+          'total. Open the earnings breakdown to see every individual job, the '
+          'distance, the base payment and any tip that was added.',
+    ),
+    _FaqItem(
+      category: 'Earnings',
+      question: 'Why is my payment different from what I expected?',
+      answer:
+          'Open your earnings breakdown and look at that individual job. '
+          'Payments change if the actual distance differed from the estimate, if '
+          'a waiting adjustment was applied, or if a tip arrived after you '
+          'finished. If the figure still looks wrong, raise it with support and '
+          'quote the order number.',
+    ),
+
+    // ── Residual Income ──────────────────────────────────────────────────────
+    _FaqItem(
+      category: 'Residual Income',
+      question: 'What is residual income and how does it work?',
+      answer:
+          'It is a thank you from GoOuts for helping us grow. When you introduce '
+          'a restaurant, cafe, shop or takeaway to GoOuts and they go live, you '
+          'earn a share of what that business pays GoOuts every week, '
+          'automatically, for as long as they stay active. Once the introduction '
+          'is made there is nothing further for you to do.',
+    ),
+    _FaqItem(
+      category: 'Residual Income',
+      question: 'Do I qualify for residual income right now?',
+      answer:
+          'Yes. We are in a grace period, so every active GoOuts driver '
+          'qualifies automatically. There are no minimum delivery counts and no '
+          'rating thresholds while the grace period is running. We will give you '
+          'plenty of notice before any rules take effect.',
+    ),
+    _FaqItem(
+      category: 'Residual Income',
+      question: 'What rules will apply once the grace period ends?',
+      answer:
+          'You will need to meet a few straightforward targets: at least 200 '
+          'completed GoOuts deliveries in total, at least 20 deliveries in the '
+          'current month, a rating of 4.2 stars or above, and at least three '
+          'months on the platform. Your referred business will also need to '
+          'process at least 10 orders a month, and your account must be clear of '
+          'active warnings or strikes. These figures can be updated by GoOuts '
+          'and the current requirements are always shown in your app.',
+    ),
+    _FaqItem(
+      category: 'Residual Income',
+      question: 'Is it difficult to qualify?',
+      answer:
+          'If you are delivering regularly and looking after customers you will '
+          'reach these targets without thinking about it. Twenty deliveries a '
+          'month works out at roughly five a week, which most active drivers '
+          'cover in a couple of shifts, and a 4.2 star rating is comfortably '
+          'achievable by turning up on time and keeping customers informed.',
+    ),
+    _FaqItem(
+      category: 'Residual Income',
+      question: 'How much can I earn from residuals?',
+      answer:
+          'It depends on how many businesses you have introduced and how busy '
+          'they are. Each week you receive a percentage of what your referred '
+          'businesses pay GoOuts, so the more orders they take the more you '
+          'earn. It builds up over time with no extra work from you.',
+    ),
+    _FaqItem(
+      category: 'Residual Income',
+      question: 'When are residuals paid?',
+      answer:
+          'Residuals are calculated every week and added to your GoOuts earnings '
+          'wallet. Your weekly residual summary shows exactly which business '
+          'contributed what amount, so you can always see where the money came '
+          'from.',
+    ),
+    _FaqItem(
+      category: 'Residual Income',
+      question: 'Does a warning or a strike affect my residuals?',
+      answer:
+          'During the grace period, no. Once the rules are live, an active '
+          'strike will pause your residual payments until the matter is '
+          'resolved. Deliver safely and professionally and this will never come '
+          'up.',
+    ),
+
+    // ── Referrals ────────────────────────────────────────────────────────────
+    _FaqItem(
+      category: 'Referrals',
+      question: 'How do I introduce a business to GoOuts?',
+      answer:
+          'Go to your profile and open the refer a business option to get your '
+          'unique link. Share it with any local restaurant, cafe, shop or '
+          'takeaway that might want to join GoOuts. When they sign up and go '
+          'live using your link, they are automatically attached to your '
+          'account.',
+    ),
+    _FaqItem(
+      category: 'Referrals',
+      question:
+          'I introduced a business but I cannot see them in my residuals.',
+      answer:
+          'Check three things first. Did they sign up using your link, are they '
+          'live and taking orders, and is your own account in good standing. If '
+          'all three are true and the residual still has not appeared after a '
+          'week, contact support and we will trace it for you.',
+    ),
+    _FaqItem(
+      category: 'Referrals',
+      question: 'What happens if my referred business goes quiet?',
+      answer:
+          'If a business you introduced falls below the monthly order threshold '
+          'once the rules are active, it will not contribute to your residuals '
+          'that week. They keep their GoOuts account and your link to them stays '
+          'in place, so you start earning again as soon as they pick back up.',
+    ),
+
+    // ── Safety ───────────────────────────────────────────────────────────────
+    _FaqItem(
+      category: 'Safety',
+      question: 'What does the Emergency SOS button do?',
+      answer:
+          'It calls 999 and shares your live location with GoOuts support at the '
+          'same time. Use it if you are in immediate danger. You are asked to '
+          'confirm first so it cannot be triggered by accident.',
+    ),
+    _FaqItem(
+      category: 'Safety',
+      question: 'Something happened but it was not an emergency.',
+      answer:
+          'Use the report option in your safety toolkit. It goes straight to the '
+          'GoOuts safety team with your location and order details attached. Use '
+          'it for aggression, unsafe premises, damage, or anything that felt '
+          'wrong but did not need the police.',
+    ),
+    _FaqItem(
+      category: 'Safety',
+      question: 'Who can see my location?',
+      answer:
+          'Your live location is only shared while you are on an active '
+          'delivery, and only with the customer waiting for that order and with '
+          'GoOuts support. It stops the moment the delivery is complete.',
+    ),
+    _FaqItem(
+      category: 'Safety',
+      question: 'What should I do if I have an accident?',
+      answer:
+          'Look after yourself first and call 999 if anyone is hurt. Once you '
+          'are safe, use the SOS or the report option so GoOuts knows what has '
+          'happened. We will reassign the order and contact the customer for '
+          'you.',
+    ),
+
+    // ── Account ──────────────────────────────────────────────────────────────
+    _FaqItem(
+      category: 'Account',
+      question: 'How do I log in?',
+      answer:
+          'GoOuts uses your phone number instead of a password. Enter your '
+          'number and we text you a single use code. Enter that code and you are '
+          'in, so there is no password to forget.',
+    ),
+    _FaqItem(
+      category: 'Account',
+      question: 'Why is my account pending verification?',
+      answer:
+          'Your documents are being checked. Most checks finish within a couple '
+          'of minutes, but anything that needs a human review can take up to two '
+          'working days. You will be notified as soon as a decision is made.',
+    ),
+    _FaqItem(
+      category: 'Account',
+      question: 'How do I update my vehicle details or my documents?',
+      answer:
+          'Open your profile settings and go to the documents section. Upload '
+          'the replacement and it will be reviewed before it takes effect. Leave '
+          'the existing document in place until the new one is approved so you '
+          'are not taken offline in the meantime.',
+    ),
+    _FaqItem(
+      category: 'Account',
+      question: 'How do I contact support?',
+      answer:
+          'Open the support section in the app to raise a ticket or start a live '
+          'chat. If your question is about a specific delivery, include the '
+          'order number, because it gets you an answer considerably faster.',
     ),
   ];
 
@@ -110,7 +360,7 @@ class FaqScreen extends StatelessWidget {
     try {
       final QuerySnapshot<Map<String, dynamic>> snapshot =
           await FirebaseFirestore.instance
-              .collection('faq')
+              .collection(kDeliveryDriverFaqCollection)
               .where('isActive', isEqualTo: true)
               .orderBy('order')
               .get();
@@ -119,17 +369,43 @@ class FaqScreen extends StatelessWidget {
         return _defaults;
       }
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return _FaqItem(
-          question: (data['question'] ?? '').toString().trim(),
-          answer: (data['answer'] ?? '').toString().trim(),
-        );
-      }).where((item) => item.question.isNotEmpty).toList();
+      final List<_FaqItem> loaded = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
+            final rawCategory = (data['category'] ?? '').toString().trim();
+            return _FaqItem(
+              category: rawCategory.isEmpty ? 'General' : rawCategory,
+              question: (data['question'] ?? '').toString().trim(),
+              answer: (data['answer'] ?? '').toString().trim(),
+            );
+          })
+          .where((item) => item.question.isNotEmpty && item.answer.isNotEmpty)
+          .toList();
+
+      // A collection full of blank rows should not produce an empty screen.
+      return loaded.isEmpty ? _defaults : loaded;
     } catch (_) {
-      // Firestore unavailable or index not yet created — use defaults
+      // Firestore unavailable, offline, or the composite index is missing.
       return _defaults;
     }
+  }
+
+  /// Groups items by category, preserving [_categoryOrder] first and then any
+  /// unrecognised categories in the order they were received.
+  static List<_FaqSection> _group(List<_FaqItem> items) {
+    final Map<String, List<_FaqItem>> buckets = <String, List<_FaqItem>>{};
+    for (final item in items) {
+      buckets.putIfAbsent(item.category, () => <_FaqItem>[]).add(item);
+    }
+
+    final List<String> ordered = <String>[
+      ..._categoryOrder.where(buckets.containsKey),
+      ...buckets.keys.where((k) => !_categoryOrder.contains(k)),
+    ];
+
+    return ordered
+        .map((name) => _FaqSection(title: name, items: buckets[name]!))
+        .toList();
   }
 
   @override
@@ -140,10 +416,10 @@ class FaqScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.close_rounded, color: Colors.black87),
+          icon: const Icon(Icons.close_rounded, color: Colors.black87),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: AutoSizeText(
+        title: const AutoSizeText(
           'FAQ',
           style: TextStyle(
             color: Colors.black87,
@@ -162,18 +438,23 @@ class FaqScreen extends StatelessWidget {
             );
           }
 
-          final List<_FaqItem> items = snapshot.data ?? _defaults;
+          final List<_FaqSection> sections = _group(snapshot.data ?? _defaults);
 
-          return ListView.separated(
+          final List<Widget> rows = <Widget>[_buildHeader()];
+          for (final section in sections) {
+            rows.add(_buildCategoryHeading(section.title));
+            for (final item in section.items) {
+              rows.add(Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _FaqTile(item: item),
+              ));
+            }
+          }
+
+          return ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-            itemCount: items.length + 1, // +1 for header
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return _buildHeader();
-              }
-              return _FaqTile(item: items[index - 1]);
-            },
+            itemCount: rows.length,
+            itemBuilder: (context, index) => rows[index],
           );
         },
       ),
@@ -182,42 +463,49 @@ class FaqScreen extends StatelessWidget {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            clipBehavior: Clip.antiAlias,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.help_outline_rounded,
-                    color: _goOutsBlue, size: 20),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Tap any question to expand the answer. '
-                    'Can\'t find what you\'re looking for? '
-                    'Contact us via Help & Support in the menu.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF1E3A8A),
-                      height: 1.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFBFDBFE)),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.help_outline_rounded, color: _goOutsBlue, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Tap any question to see the answer. If you cannot find what '
+                'you need, open the support section and we will help.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF1E3A8A),
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
                 ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryHeading(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 10, left: 2),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF64748B),
+          letterSpacing: 1.1,
+        ),
       ),
     );
   }
@@ -228,10 +516,22 @@ class FaqScreen extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _FaqItem {
+  final String category;
   final String question;
   final String answer;
 
-  const _FaqItem({required this.question, required this.answer});
+  const _FaqItem({
+    required this.category,
+    required this.question,
+    required this.answer,
+  });
+}
+
+class _FaqSection {
+  final String title;
+  final List<_FaqItem> items;
+
+  const _FaqSection({required this.title, required this.items});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -246,8 +546,7 @@ class _FaqTile extends StatefulWidget {
   State<_FaqTile> createState() => _FaqTileState();
 }
 
-class _FaqTileState extends State<_FaqTile>
-    with SingleTickerProviderStateMixin {
+class _FaqTileState extends State<_FaqTile> {
   static const Color _goOutsBlue = Color(0xFF0392CA);
 
   bool _expanded = false;
@@ -265,7 +564,7 @@ class _FaqTileState extends State<_FaqTile>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -274,14 +573,13 @@ class _FaqTileState extends State<_FaqTile>
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: ExpansionTile(
-          tilePadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          childrenPadding:
-              const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           expandedCrossAxisAlignment: CrossAxisAlignment.start,
           iconColor: _goOutsBlue,
           collapsedIconColor: Colors.black45,
           onExpansionChanged: (value) {
+            if (!mounted) return;
             setState(() {
               _expanded = value;
             });
@@ -296,8 +594,8 @@ class _FaqTileState extends State<_FaqTile>
             ),
           ),
           children: [
-            Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-            SizedBox(height: 12),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+            const SizedBox(height: 12),
             AutoSizeText(
               widget.item.answer,
               style: const TextStyle(
