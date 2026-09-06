@@ -85,7 +85,16 @@ flutter:
     - assets/logo/business_code.png
     - assets/delivery/
 
-  fonts:
-    - family: Helvetica
-      fonts:
-        - asset: assets
+  # ⚠ REMOVED 6 September 2026 — was:
+  #   fonts:
+  #     - family: Helvetica
+  #       fonts:
+  #         - asset: assets
+  # "asset: assets" points at a folder, not a font file — invalid, and it's
+  # what broke every CI archive after the pod install conflict was fixed
+  # ("unable to locate asset entry in pubspec.yaml: assets"). Nothing in the
+  # app references fontFamily: 'Helvetica' (checked lib/ — the real theme
+  # uses 'Inter', declared nowhere near this block), so this was dead,
+  # broken config rather than something to repair. Real Helvetica .ttf files
+  # still sit in assets/fonts/ if a real need for this ever comes up —
+  # they were just never wired to a valid pubspec entry.
