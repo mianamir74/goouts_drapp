@@ -7,8 +7,13 @@ import 'package:flutter/material.dart';
 //  FoodDeliveryChatScreen (Driver) — Driver ↔ Customer in-app chat
 //
 //  Window: Driver can send while status is driver_heading_to_restaurant or
-//          driver_picked_up, and for 15 min after deliveredAt.
+//          driver_picked_up, and for 30 min after deliveredAt.
 //          After that, input is locked (read-only history preserved).
+//
+//  ⚠ Was 15 min here vs 30 min on the consumer side (food_delivery_chat_screen.dart
+//  in goouts_app) — an asymmetric window meant the customer could still type
+//  for 15 minutes after the driver's input had already locked, with no way for
+//  the driver to reply. Matched to 30 min on 4 September 2026.
 // ─────────────────────────────────────────────────────────────────────────────
 class FoodDeliveryChatScreen extends StatefulWidget {
   final String orderId;
@@ -64,7 +69,7 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
     const active = ['driver_heading_to_restaurant', 'driver_picked_up'];
     if (active.contains(status)) return true;
     if (status == 'delivered' && deliveredAt != null) {
-      return DateTime.now().isBefore(deliveredAt.add(const Duration(minutes: 15)));
+      return DateTime.now().isBefore(deliveredAt.add(const Duration(minutes: 30)));
     }
     return false;
   }
@@ -72,7 +77,7 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
   void _scheduleLock(DateTime? deliveredAt) {
     _lockTimer?.cancel();
     if (_orderStatus == 'delivered' && deliveredAt != null) {
-      final rem = deliveredAt.add(const Duration(minutes: 15)).difference(DateTime.now());
+      final rem = deliveredAt.add(const Duration(minutes: 30)).difference(DateTime.now());
       if (rem > Duration.zero) {
         _lockTimer = Timer(rem, () { if (mounted) setState(() => _chatOpen = false); });
       }
@@ -192,7 +197,7 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
               color: Colors.white.withOpacity(0.04),
               child: Text(
                 _orderStatus == 'delivered'
-                    ? 'Chat closed — 15 min window has passed'
+                    ? 'Chat closed — 30 min window has passed'
                     : 'Chat opens when you head to the restaurant',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white38, fontSize: 12),

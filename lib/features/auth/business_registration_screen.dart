@@ -13,6 +13,7 @@ import '../home/business_home_screen.dart';
 import '../legal/terms_and_conditions_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
+import '../../screens/liveness_selfie_screen.dart';
 
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({
@@ -37,12 +38,21 @@ class _BusinessRegistrationScreenState
   static const String _defaultBusinessReferralCode = 'GB000001';
   static const String _defaultCountry = 'UNITED KINGDOM';
   static const String _northernIrelandCountry = 'NORTHERN IRELAND';
-  static const String _mapboxPublicToken =
-      'pk.eyJ1IjoibWlhbmFtaXI3NCIsImEiOiJjbW44aGp1bTYwYzVrMnBxcnRvYzA5bG40In0.2thWcmSMupWuGVNKJmfQyg';
+  // _mapboxPublicToken removed 13 August 2026. This screen declared its own
+  // copy of the Mapbox token and never used it — every lookup goes through
+  // AddressLookupService. A dead field holding a credential is the worst of
+  // both: no benefit, and one more place a token gets pasted back in.
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final AddressLookupService _addressService = AddressLookupService();
-  final ImagePicker _imagePicker = ImagePicker();
+  // ⚠ THE ImagePicker FIELD WAS REMOVED 24 August 2026. The selfie now comes
+  // from LivenessSelfieScreen, which owns its own camera, and this screen has
+  // no other picker call. The image_picker import stays because XFile comes
+  // from it and _selfieImage is still an XFile — dropping that import breaks
+  // the build in a way that reads as unrelated to this change.
+  //
+  // registration_screen.dart still holds its own field: that screen picks the
+  // identity DOCUMENTS as well, and those still go through image_picker.
 
   final List<String> _prefixOptions = <String>['Mr', 'Mrs', 'Miss', 'Ms', 'Dr'];
   final List<String> _countryOptions = <String>[
@@ -137,6 +147,17 @@ class _BusinessRegistrationScreenState
   bool _isLookingUpAddress = false;
 
   XFile? _selfieImage;
+
+  /// What the phone thought of the selfie, and whether the head-sweep finished.
+  ///
+  /// ⚠ ADVISORY ONLY. Client-written and trivially forgeable, so nothing
+  /// automated may key off them. New on 24 August 2026 — before that this
+  /// screen stored a photograph with no opinion attached, because it ran no
+  /// check at all.
+  bool _livenessComplete = false;
+  String _livenessNote = '';
+  String? _selfieAdvice;
+  Map<String, dynamic>? _selfieScores;
 
   @override
   void initState() {
@@ -344,21 +365,49 @@ class _BusinessRegistrationScreenState
         _isPickingSelfie = true;
       });
 
-      final XFile? pickedImage = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        imageQuality: 85,
-        maxWidth: 1200,
-      );
+      // ── ⚠ THE LIVE CAMERA REPLACED image_picker HERE, 24 August 2026 ───────
+      //
+      // This was the worst selfie path in the estate and it is worth recording
+      // why, because both faults were invisible from the outside.
+      //
+      // 1. imageQuality: 85 AND maxWidth: 1200 — the exact combination
+      //    documented across this codebase as destroying identity photographs.
+      //    Either one makes image_picker re-encode the file, which DROPS the
+      //    EXIF orientation tag WITHOUT rotating the pixels. The result is a
+      //    sideways photograph with nothing left to say it is sideways.
+      //
+      // 2. NO CHECK OF ANY KIND. Whatever the camera returned was assigned
+      //    straight to _selfieImage. A wall, a shoe or the ceiling was accepted
+      //    as a business partner's identity selfie and discovered only when an
+      //    admin opened it days later — if they opened it.
+      //
+      // This app also had no image_orientation.dart and no face check service
+      // at all, so neither fault could have been fixed here in isolation. Both
+      // arrived with this change.
+      //
+      // ⚠ LivenessSelfieScreen RETURNS THE FINISHED ARTICLE — upright,
+      // downscaled and inspected, and it will not hand back a photograph with
+      // no usable face in it. Do not add a resize or a re-check here.
+      final LivenessSelfieResult? shot =
+          await LivenessSelfieScreen.open(context);
 
       if (!mounted) {
         return;
       }
 
-      if (pickedImage != null) {
+      // null means they backed out without taking one. Nothing happened.
+      if (shot != null) {
         setState(() {
-          _selfieImage = pickedImage;
+          _selfieImage = XFile(shot.path);
           _showSelfieError = false;
+          // ⚠ ADVISORY, NEVER A DECISION — client-written and trivially
+          // forged. false means the head-sweep ran out of time and the photo
+          // was taken anyway: a note telling a reviewer to look harder, not a
+          // rejection. The app assists, the admin judges.
+          _livenessComplete = shot.livenessComplete;
+          _livenessNote = shot.livenessNote;
+          _selfieAdvice = shot.advice;
+          _selfieScores = Map<String, dynamic>.from(shot.scores);
         });
       }
     } catch (e) {
@@ -809,6 +858,14 @@ class _BusinessRegistrationScreenState
         'referralCode': ownReferralCode,
         'profilePhotoUrl': profilePhotoUrl,
         'selfieUrl': profilePhotoUrl,
+        // ⚠ ADVISORY, NEVER A DECISION. Client-written and trivially forged.
+        // livenessComplete false means the head-sweep ran out of time and the
+        // photo was taken anyway — a note telling a reviewer to look harder,
+        // not a rejection.
+        'livenessComplete': _livenessComplete,
+        if (_livenessNote.isNotEmpty) 'livenessNote': _livenessNote,
+        if (_selfieAdvice != null) 'selfieAdvice': _selfieAdvice,
+        if (_selfieScores != null) 'selfieScores': _selfieScores,
         'businessProfileVerificationStatus': 'submitted',
         'businessProfileVerificationBackendStatus': 'submitted',
         'businessProfileVerificationSubmittedAt': FieldValue.serverTimestamp(),

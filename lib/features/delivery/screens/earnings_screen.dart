@@ -104,9 +104,116 @@ class _EarningsScreenState extends State<EarningsScreen> {
     });
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  //  INSTANT PAY IS NOT BUILT. Audited 4 August 2026.
+  //
+  //  This flow showed a driver a fee breakdown, a "Transfer Now" button, and
+  //  on success the message "£X transferred to your bank. Arrives within 30
+  //  minutes." It called `driverRequestInstantPayout`, WHICH DOES NOT EXIST,
+  //  through FirebaseFunctions.instance — no region, so it defaulted to
+  //  us-central1 while every GoOuts function is europe-west1. Wrong function,
+  //  wrong region.
+  //
+  //  It failed safely, because a missing function throws and the catch showed
+  //  "Transfer Failed". But the success path did this:
+  //
+  //      setState(() { _pendingPayout = 0; ... });
+  //
+  //  It zeroed the driver's pending balance in the UI on the strength of the
+  //  call returning — before re-reading anything from the server. Any future
+  //  function that resolved without actually moving money would have shown a
+  //  driver a zero balance and a message saying it had reached their bank.
+  //
+  //  NOT FIXED BY BUILDING THE FUNCTION. Paying money into someone's bank
+  //  account needs payment rails, verified bank details and a reconciliation
+  //  path, none of which exist here. Writing a plausible-looking payout
+  //  function would be the most dangerous thing in this repository.
+  //
+  //  So the button now says what is true. When the rails exist, delete this
+  //  guard — do not delete the fee breakdown below it, which is still correct.
+  // ───────────────────────────────────────────────────────────────────────────
+  static const bool instantPayAvailable = false;
+
+  // ── The payout terms, defined ONCE ─────────────────────────────────────────
+  //
+  // Set 4 August 2026 from the agreed model, which matches how Uber and
+  // Deliveroo work:
+  //
+  //   * the weekly automatic transfer is FREE, on MONDAY
+  //   * a driver may cash out their balance at any time for a £0.50 fee
+  //
+  // Applies to BOTH driver types in this app — food delivery and cab.
+  //
+  // SET FROM THE MARKET, checked 4 August 2026:
+  //   Deliveroo  50p per cash-out, no published minimum, free weekly (Tuesday)
+  //   Uber Eats  50p per instant cashout, free at 1-2 business days,
+  //              £1,600 weekly cap on early withdrawal
+  //
+  // The screen said £1.00, which would have made GoOuts the most expensive of
+  // the three. Drivers compare these directly — many work for all three on the
+  // same shift — so being double the market on a fee they see every time they
+  // cash out is not a small difference.
+  //
+  // The fee was hardcoded in three separate places that each had to agree: the
+  // arithmetic, the fee-breakdown row, and the summary line under the button.
+  // Three copies of a number a driver is charged is three chances to show one
+  // figure and deduct another. One constant now feeds all of them.
+  //
+  // ⚠ These belong in platform_config, like the Short Stay economics, so they
+  //   can be changed without an App Store release. Hardcoding a fee means
+  //   changing it costs a review cycle. Raised as a follow-up, not done here.
+  static const double instantPayFee = 0.50;
+
+  // GoOuts pays weekly on Monday. Deliveroo uses Tuesday — that is their
+  // operational choice, not a competitive term, so this stays as agreed.
+  static const String weeklyPayoutDay = 'Monday';
+
+  // NO FIXED MINIMUM, matching Deliveroo and Uber Eats.
+  //
+  // There was a £1.00 minimum against a £1.00 fee, so a driver cashing out the
+  // smallest permitted amount received EXACTLY £0.00 — the screen would have
+  // shown them "You receive £0.00" and taken the entire balance as the fee.
+  //
+  // Raising the minimum was one fix. Removing it is the better one, because it
+  // is what the market actually does: Deliveroo lets a rider cash out their
+  // current balance, whatever it is. The only rule that has to hold is that
+  // the driver ends up with something, so the guard below refuses a cash-out
+  // that would not clear the fee, rather than enforcing an arbitrary floor.
+  static bool canCashOut(double balance) => balance > instantPayFee;
+
+  // Uber caps early withdrawals at £1,600 a week — a float and fraud control,
+  // not a fee. GoOuts needs an equivalent before instant pay goes live.
+  //
+  // NOT DECLARED AS A CONSTANT HERE, deliberately. It was, and the analyzer
+  // correctly called it an unused field: a cap that no code reads enforces
+  // nothing, and a named constant sitting in a screen file gives the false
+  // impression that a limit exists.
+  //
+  // The check belongs in the payout Cloud Function, because a client-side cap
+  // is advisory — anyone calling the function directly ignores it. The
+  // requirement is recorded in the task list, which is where a requirement
+  // with no implementation should live.
+
   Future<void> _requestInstantPayout() async {
-    if (_pendingPayout < 1.0) {
-      GoOutsSheet.warning(context, title: 'Minimum Payout', message: 'Minimum payout is £1.00.');
+    if (!instantPayAvailable) {
+      GoOutsSheet.warning(
+        context,
+        title: 'Instant Pay is not available yet',
+        message:
+            'Your earnings are safe and are included in the weekly payout on '
+            '$weeklyPayoutDay. Instant transfer is coming once bank payouts '
+            'are live.',
+      );
+      return;
+    }
+    if (!canCashOut(_pendingPayout)) {
+      // Deliberately phrased as what they'd receive, not as a rule they broke.
+      GoOutsSheet.warning(context,
+          title: 'Balance too low to cash out',
+          message:
+              'The £${instantPayFee.toStringAsFixed(2)} fee would take your '
+              'whole balance. Your earnings transfer free every '
+              '$weeklyPayoutDay.');
       return;
     }
 
@@ -121,7 +228,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
             style: TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold)),
         content: Builder(builder: (context) {
-          final net = (_pendingPayout - 1.00).clamp(0.0, double.infinity);
+          final net =
+              (_pendingPayout - instantPayFee).clamp(0.0, double.infinity);
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,7 +245,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   children: [
                     _feeRow('Your balance', '£${_pendingPayout.toStringAsFixed(2)}', Colors.white),
                     const SizedBox(height: 8),
-                    _feeRow('GoOuts admin fee', '- £1.00', const Color(0xFFf97316)),
+                    _feeRow(
+                        'GoOuts admin fee',
+                        '- £${instantPayFee.toStringAsFixed(2)}',
+                        const Color(0xFFf97316)),
                     const Divider(color: Colors.white12, height: 20),
                     _feeRow('You receive', '£${net.toStringAsFixed(2)}', const Color(0xFF10b981), bold: true),
                   ],
@@ -145,7 +256,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Funds arrive within 30 minutes.\nWeekly auto-payout on Tuesday is always free.',
+                'Before 17:30 Mon-Fri your money arrives immediately. '
+                'Otherwise it lands the next working day.\n'
+                'Your weekly transfer on $weeklyPayoutDay is always free.',
                 style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
               ),
             ],
@@ -177,22 +290,33 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
     setState(() => _payoutLoading = true);
     try {
-      final fn = FirebaseFunctions.instance
+      // europe-west1. This was FirebaseFunctions.instance with no region,
+      // which defaults to us-central1 — so even once the function exists it
+      // would not have been found.
+      final fn = FirebaseFunctions.instanceFor(region: 'europe-west1')
           .httpsCallable('driverRequestInstantPayout');
       final result = await fn.call();
       if (!mounted) return;
-      setState(() {
-        _pendingPayout = 0;
-        _payoutLoading = false;
-      });
+      setState(() => _payoutLoading = false);
+
+      // The balance is NOT zeroed here any more.
+      //
+      // It used to be set to 0 the instant the call returned. A function that
+      // resolved without actually moving the money — a partial failure, a
+      // provider timeout treated as success — would have shown the driver a
+      // zero balance and told them it had reached their bank. _load() re-reads
+      // the real figure from the server, which is the only number worth
+      // showing for somebody's wages.
       final net = result.data['netAmount'];
       GoOutsSheet.success(
         context,
-        title: 'Transferred! 💸',
-        message:
-            '£${net?.toStringAsFixed(2)} transferred to your bank. Arrives within 30 mins.',
+        title: 'Transfer requested',
+        message: net is num
+            ? '£${net.toStringAsFixed(2)} is on its way to your bank. '
+                'Your balance will update once it settles.'
+            : 'Your transfer has been requested.',
       );
-      _load(); // refresh balances
+      await _load(); // authoritative balance, from the server
     } catch (e) {
       if (!mounted) return;
       setState(() => _payoutLoading = false);
@@ -389,7 +513,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
                               color: Color(0xFF10b981)),
                         ),
                         const SizedBox(height: 2),
-                        const Text('£1.00 admin fee applies · Weekly free',
+                        Text(
+                            '£${instantPayFee.toStringAsFixed(2)} admin fee applies · Weekly free',
                             style: TextStyle(
                                 color: Colors.white38,
                                 fontSize: 10)),

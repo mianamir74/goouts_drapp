@@ -177,6 +177,22 @@ class DriverFcmService {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  ⚠ FIXED 5 September 2026. This checked businesses/drivers/cab_drivers —
+  //  none of which this app ever writes to. dapp_registration_screen.dart
+  //  creates every driver's profile under food_drivers/{uid}, and every live
+  //  screen (dashboard, earnings, profile) reads/writes food_drivers too. So
+  //  this method always fell through to the "no profile exists" branch and
+  //  RETURNED WITHOUT SAVING ANYTHING — a real food delivery driver's FCM
+  //  token was never written anywhere, silently, for every install.
+  //
+  //  Same shape as the /businesses-vs-/stay_hosts confusion found in the Host
+  //  app on 8 August: code copied from driver_app ("GoOuts Lead") carrying
+  //  driver_app's collection names into an app with a different identity
+  //  model. food_drivers checked first and is expected to be the only hit;
+  //  the other three are kept as a fallback only in case a uid somehow also
+  //  holds one of those other roles.
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> _saveTokenForCurrentUser({
   required String token,
   required bool notificationsEnabled,
@@ -187,6 +203,9 @@ class DriverFcmService {
     debugPrint('FCM token save skipped: no logged-in user.');
     return;
   }
+
+  final DocumentSnapshot<Map<String, dynamic>> foodDriverDoc =
+      await _firestore.collection('food_drivers').doc(user.uid).get();
 
   final DocumentSnapshot<Map<String, dynamic>> businessDoc =
       await _firestore.collection('businesses').doc(user.uid).get();
@@ -199,7 +218,9 @@ class DriverFcmService {
 
   String targetCollection;
 
-  if (businessDoc.exists) {
+  if (foodDriverDoc.exists) {
+    targetCollection = 'food_drivers';
+  } else if (businessDoc.exists) {
     targetCollection = 'businesses';
   } else if (driverDoc.exists) {
     targetCollection = 'drivers';
@@ -207,7 +228,8 @@ class DriverFcmService {
     targetCollection = 'cab_drivers';
   } else {
     debugPrint(
-      'FCM token save skipped: no business, driver, or cab_driver profile exists for ${user.uid}.',
+      'FCM token save skipped: no food_drivers, business, driver, or '
+      'cab_driver profile exists for ${user.uid}.',
     );
     return;
   }

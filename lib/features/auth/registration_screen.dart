@@ -25,6 +25,8 @@ import 'widgets/vehicle_info_section.dart';
 import '../legal/terms_and_conditions_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
+import '../../screens/liveness_selfie_screen.dart';
+import '../../services/image_orientation.dart';
 
 // NOTE:
 // This file is the user-requested updated copy of file:965 with these 4 changes:
@@ -54,8 +56,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   static const int _verificationSupportThreshold = 3;
   static const String _defaultDriverCountry = 'UNITED KINGDOM';
   static const String _northernIrelandCountry = 'NORTHERN IRELAND';
-  static const String _mapboxPublicToken =
-      'pk.eyJ1IjoibWlhbmFtaXI3NCIsImEiOiJjbW44aGp1bTYwYzVrMnBxcnRvYzA5bG40In0.2thWcmSMupWuGVNKJmfQyg';
+  // _mapboxPublicToken removed 13 August 2026. This screen declared its own
+  // copy of the Mapbox token and never used it — every lookup goes through
+  // AddressLookupService. A dead field holding a credential is the worst of
+  // both: no benefit, and one more place a token gets pasted back in.
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final AddressLookupService _addressService = AddressLookupService();
@@ -123,6 +127,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
 
   XFile? _selfieImage;
+
+  /// What the phone thought of the selfie, and whether the head-sweep finished.
+  ///
+  /// ⚠ ADVISORY ONLY. Client-written and trivially forgeable, so nothing
+  /// automated may key off them. New on 24 August 2026 — this app previously
+  /// ran no selfie check of any kind.
+  bool _livenessComplete = false;
+  String _livenessNote = '';
+  String? _selfieAdvice;
+  Map<String, dynamic>? _selfieScores;
   XFile? _drivingLicenceFrontImage;
   XFile? _drivingLicenceBackImage;
   XFile? _passportImage;
@@ -460,17 +474,38 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       setState(() {
         _isPickingSelfie = true;
       });
-      final XFile? pickedImage = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        imageQuality: 85,
-        maxWidth: 1200,
-      );
+      // ── ⚠ THE LIVE CAMERA REPLACED image_picker HERE, 24 August 2026 ───────
+      //
+      // What was here had both faults at once:
+      //
+      // 1. imageQuality: 85 AND maxWidth: 1200 — the combination documented
+      //    across this codebase as destroying identity photographs. Either one
+      //    makes image_picker re-encode, which DROPS the EXIF orientation tag
+      //    WITHOUT rotating the pixels, leaving a sideways image with nothing
+      //    left to say it is sideways.
+      //
+      // 2. NO CHECK AT ALL. Whatever the camera returned went straight into
+      //    _selfieImage and on to Storage.
+      //
+      // ⚠ LivenessSelfieScreen RETURNS THE FINISHED ARTICLE — upright,
+      // downscaled and inspected — and will not hand back a photograph with no
+      // usable face in it. Do not add a resize or a re-check here.
+      final LivenessSelfieResult? shot =
+          await LivenessSelfieScreen.open(context);
       if (!mounted) return;
-      if (pickedImage != null) {
+
+      // null means they backed out without taking one. Nothing happened.
+      if (shot != null) {
         setState(() {
-          _selfieImage = pickedImage;
+          _selfieImage = XFile(shot.path);
           _showSelfieError = false;
+          // ⚠ ADVISORY, NEVER A DECISION — client-written and trivially
+          // forged. false means the head-sweep ran out of time and the photo
+          // was taken anyway: look harder, not reject.
+          _livenessComplete = shot.livenessComplete;
+          _livenessNote = shot.livenessNote;
+          _selfieAdvice = shot.advice;
+          _selfieScores = Map<String, dynamic>.from(shot.scores);
         });
       }
     } catch (e) {
@@ -580,7 +615,30 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Future<XFile?> _pickDocumentImage({required String dialogTitle}) async {
     final ImageSource? source = await _showDocumentSourceDialog(dialogTitle);
     if (source == null) return null;
-    return _imagePicker.pickImage(source: source, imageQuality: 90, maxWidth: 1800);
+
+    // ── ⚠ imageQuality AND maxWidth REMOVED, 24 August 2026. DO NOT PUT THEM
+    //    BACK. ──────────────────────────────────────────────────────────────
+    //
+    // Either one makes image_picker re-encode the file, which DROPS the EXIF
+    // orientation tag WITHOUT rotating the pixels. What is left is a sideways
+    // photograph with nothing attached to say it is sideways.
+    //
+    // On an identity DOCUMENT that is worse than on a selfie, because the
+    // quality inspector checks the ASPECT RATIO of a card: a correctly held
+    // driving licence measured on its side reads as the wrong shape and is
+    // refused. The applicant is told to retake a photograph that was already
+    // correct.
+    //
+    // The resize now happens inside normaliseOrientation, AFTER the rotation
+    // has been baked into the pixels where nothing can lose it.
+    //
+    // Normalised HERE rather than in each caller — licence front, licence back
+    // and passport all come through this one method, and one of them would
+    // eventually be missed. That is precisely how the consumer app ended up
+    // with the gallery path fixed and the camera path not.
+    final XFile? picked = await _imagePicker.pickImage(source: source);
+    if (picked == null) return null;
+    return XFile(await normaliseOrientation(picked.path));
   }
 
   Future<void> _pickDrivingLicenceFront() async {
@@ -872,6 +930,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final Map<String, dynamic> payload = <String, dynamic>{
       'profilePhotoUrl': profilePhotoUrl,
       'selfieUrl': profilePhotoUrl,
+      // ⚠ ADVISORY, NEVER A DECISION. Client-written and trivially forged.
+      // livenessComplete false means the head-sweep ran out of time and the
+      // photo was taken anyway — look harder, not reject.
+      'livenessComplete': _livenessComplete,
+      if (_livenessNote.isNotEmpty) 'livenessNote': _livenessNote,
+      if (_selfieAdvice != null) 'selfieAdvice': _selfieAdvice,
+      if (_selfieScores != null) 'selfieScores': _selfieScores,
       'identityVerificationStatus': 'submitted',
       'identityVerificationBackendStatus': 'submitted',
       'identityVerificationFailureCount': 0,
@@ -1071,7 +1136,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           FirebaseFirestore.instance
               .collection(_firestoreDriverCollection)
               .doc(inviterUid)
-              .collection('sentinvites')
+              // FIXED 3 August 2026. This read 'sentinvites', no underscore.
+              // Every reader uses 'sent_invites', including
+              // driver_home_screen.dart, so a driver's invite resolution was
+              // being written to a subcollection nothing looks at. The
+              // inviter never saw that their referral had joined.
+              //
+              // The business path further down this same file was already
+              // correct, which is why it only affected drivers. driver_app's
+              // header note says "4) sentinvites -> sentinvites", a mangled
+              // instruction that was never actually carried out here.
+              .collection('sent_invites')
               .doc(inviteId),
           updateData,
           SetOptions(merge: true),
@@ -1381,6 +1456,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         'referralCode': ownReferralCode,
         'profilePhotoUrl': profilePhotoUrl,
         'selfieUrl': profilePhotoUrl,
+      // ⚠ ADVISORY, NEVER A DECISION. Client-written and trivially forged.
+      // livenessComplete false means the head-sweep ran out of time and the
+      // photo was taken anyway — look harder, not reject.
+      'livenessComplete': _livenessComplete,
+      if (_livenessNote.isNotEmpty) 'livenessNote': _livenessNote,
+      if (_selfieAdvice != null) 'selfieAdvice': _selfieAdvice,
+      if (_selfieScores != null) 'selfieScores': _selfieScores,
         'businessProfileVerificationStatus': 'submitted',
         'businessProfileVerificationBackendStatus': 'submitted',
         'businessProfileVerificationSubmittedAt': FieldValue.serverTimestamp(),

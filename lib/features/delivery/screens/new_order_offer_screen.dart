@@ -1,7 +1,6 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import 'active_delivery_screen.dart';
@@ -48,15 +47,23 @@ class _NewOrderOfferScreenState extends State<NewOrderOfferScreen>
     super.dispose();
   }
 
+  // ⚠ REWRITTEN 6 September 2026. Was a direct client-side
+  // food_orders.doc(id).update({...}) — firestore.rules has always had
+  // `allow update: if false` on food_orders ("the callables above only"),
+  // so every real driver tapping Accept on a real order hit
+  // permission-denied here, silently caught by the try/catch below and shown
+  // as a generic "Accept Failed" with no indication it could never have
+  // worked. See food_dispatch.js for the real callable and why this is a
+  // broadcast offer — another driver may win the race, and that failure is
+  // now told to the driver honestly rather than folded into "please try
+  // again".
   Future<void> _accept() async {
     _timer?.cancel();
     setState(() => _loading = true);
-    final uid = FirebaseAuth.instance.currentUser?.uid;
     try {
-      await FirebaseFirestore.instance
-          .collection('food_orders')
-          .doc(widget.order['id'])
-          .update({'status': 'driver_heading_to_restaurant', 'driverId': uid});
+      await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('acceptFoodOrder')
+          .call({'orderId': widget.order['id']});
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -64,6 +71,18 @@ class _NewOrderOfferScreenState extends State<NewOrderOfferScreen>
           builder: (_) => ActiveDeliveryScreen(orderId: widget.order['id']),
         ),
       );
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      final bool takenByAnother = e.code == 'failed-precondition';
+      GoOutsSheet.error(
+        context,
+        title: takenByAnother ? 'Already Taken' : 'Accept Failed',
+        message: takenByAnother
+            ? 'Another driver got there first. We\'ll show you the next order.'
+            : (e.message ?? 'Failed to accept order. Please try again.'),
+      );
+      if (takenByAnother && mounted) Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -72,8 +91,19 @@ class _NewOrderOfferScreenState extends State<NewOrderOfferScreen>
     }
   }
 
+  // ⚠ WIRED 6 September 2026. Previously did no write at all — the order
+  // stayed exactly as it was, so under the old (never-working) assignment
+  // model it would have been offered straight back to the same driver.
+  // declineFoodOrder records this driver in declinedBy so the dashboard's
+  // offer query filters it out; it does not need to be awaited before
+  // leaving this screen, and a failure here must not trap the driver on a
+  // declined offer.
   void _decline() {
     _timer?.cancel();
+    FirebaseFunctions.instanceFor(region: 'europe-west1')
+        .httpsCallable('declineFoodOrder')
+        .call({'orderId': widget.order['id']})
+        .catchError((_) {});
     if (!mounted) return;
     Navigator.pop(context);
   }

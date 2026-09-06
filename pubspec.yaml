@@ -19,6 +19,13 @@ dependencies:
   go_router: ^17.1.0
   image_picker: ^1.2.1
   google_mlkit_face_detection: ^0.13.2
+  # Live preview for the KYC selfie. The auto-capture + liveness ring read
+  # frames from this; image_picker alone can only hand back a finished photo.
+  camera: ^0.12.0+1
+  # ADDED 24 Aug 2026 — this app had NO image package, so it had no way to
+  # bake EXIF rotation into pixels. Its passports and selfies were being
+  # stored sideways and failing the face check for that reason alone.
+  image: ^4.1.7
   permission_handler: ^12.0.1
   share_plus: ^12.0.1
   intl: ^0.20.2

@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'safety_toolkit_screen.dart';
 import 'identity_verification_screen.dart';
+// Both screens already existed, fully built, in lib/features/support — just
+// never opened from anywhere in the live app (part of the ~50-file dead
+// tree). collectionName: 'food_drivers' matches the real identity collection
+// (dapp_registration_screen.dart), and admin_dashboard.dart's Support section
+// now has a 'food_drivers' tab/label to actually see what lands here — see
+// the 6 September 2026 comment beside the food_drivers _sourceTab.
+import '../../support/help_support_screen.dart';
+import '../../legal/faq_screen.dart';
 
 class SupportTrainingScreen extends StatelessWidget {
   const SupportTrainingScreen({super.key});
@@ -88,7 +97,15 @@ class SupportTrainingScreen extends StatelessWidget {
                 // Live Chat card
                 Expanded(
                   child: GestureDetector(
-                    onTap: () {},
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const HelpSupportScreen(
+                          accountType: 'driver',
+                          collectionName: 'food_drivers',
+                        ),
+                      ),
+                    ),
                     child: Container(
                       height: 100,
                       decoration: BoxDecoration(
@@ -115,7 +132,10 @@ class SupportTrainingScreen extends StatelessWidget {
                 // FAQs card
                 Expanded(
                   child: GestureDetector(
-                    onTap: () {},
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const FaqScreen()),
+                    ),
                     child: Container(
                       height: 100,
                       decoration: BoxDecoration(
@@ -145,6 +165,18 @@ class SupportTrainingScreen extends StatelessWidget {
             const SizedBox(height: 26),
 
             // ── Training & Safety ─────────────────────────────────────
+            //
+            // ⚠ KNOWN PLACEHOLDER, FLAGGED NOT FIXED — 6 September 2026. Both
+            // _trainingItem() calls below pass hardcoded completed/progress
+            // values; there is no training-content collection, no video
+            // player, nothing backing "Resume" anywhere in this codebase
+            // (checked: no training_modules/course collection exists). Same
+            // situation as host_14's pricing alert — building a real training
+            // system is a product decision, not a button fix, so it is left
+            // as Stitch-shell demo content per STANDING_CONTEXT_GOOUTS.md §1
+            // rather than wired to nothing. Same applies to the three Driver
+            // Perks cards further down (Fuel Discount/Health Insurance/
+            // Equipment Support) — no partner/perk backend exists.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -378,6 +410,19 @@ class SupportTrainingScreen extends StatelessWidget {
         ),
       );
 
+  // ⚠ FIXED 6 September 2026. This dialog previously said "tapping continue
+  // will alert our safety team and share your location" and then, on tap,
+  // did neither — just closed itself. No safety_alerts collection, no
+  // real-time monitoring, no location share exists anywhere in this
+  // codebase. A false promise on an emergency button is worse than no
+  // button at all, so this now does the one real, honest, zero-new-backend
+  // thing available: opens the phone dialer pre-filled with 999, exactly
+  // like the restaurant/customer call buttons elsewhere in this app. It does
+  // NOT place the call automatically — the driver still presses call — and
+  // it does NOT claim GoOuts is monitoring or will respond. A real in-app
+  // safety-alert pipeline (staffed monitoring, location share) is a genuine
+  // feature to build later, not a copy fix, and should be scoped and asked
+  // for separately.
   void _showSOS(BuildContext context) {
     showDialog(
       context: context,
@@ -395,7 +440,9 @@ class SupportTrainingScreen extends StatelessWidget {
           ],
         ),
         content: const Text(
-          'Are you in an emergency? Tapping continue will alert our safety team and share your location.',
+          'Are you in an emergency? Tapping continue opens your phone '
+          'dialer with 999 ready to call. GoOuts does not monitor this '
+          'button — for non-emergency help use Live Chat.',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -405,14 +452,17 @@ class SupportTrainingScreen extends StatelessWidget {
                 style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () async {
+              Navigator.pop(context);
+              await launchUrl(Uri(scheme: 'tel', path: '999'));
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFef4444),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Send SOS',
+            child: const Text('Call 999',
                 style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],

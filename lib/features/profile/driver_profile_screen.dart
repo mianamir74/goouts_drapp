@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import '../legal/terms_and_conditions_screen.dart';
+import '../../utils/kyc_status.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({super.key});
@@ -404,15 +405,26 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     final String rawStatus =
         _readString(data, keys, fallback: 'submitted').trim().toLowerCase();
 
-    if (rawStatus == 'verified' || rawStatus == 'approved' || rawStatus == 'success') {
-      return 'verified';
+    // ── Routed through utils/kyc_status.dart, 25 August 2026. ───────────────
+    //
+    // This screen was already CORRECT — it accepted 'approved' as well as
+    // 'verified'. business_profile_screen, four files away, did not, and that
+    // is precisely the problem: two screens in one app, each with its own
+    // private list of words, and no way to tell which list was right.
+    //
+    // Behaviour is unchanged. 'success' and 'needs_support' were carried into
+    // the shared parser so nothing is lost. The 'submitted' fallback stays:
+    // an unknown or missing value means WAITING here, not "never started",
+    // because registration always writes a value.
+    switch (kycStatusFrom(rawStatus)) {
+      case KycStatus.approved:
+        return 'verified';
+      case KycStatus.rejected:
+        return 'rejected';
+      case KycStatus.pending:
+      case KycStatus.none:
+        return 'submitted';
     }
-
-    if (rawStatus == 'rejected' || rawStatus == 'failed' || rawStatus == 'needs_support') {
-      return 'rejected';
-    }
-
-    return 'submitted';
   }
 
   String _buildVerificationStatusLabel({

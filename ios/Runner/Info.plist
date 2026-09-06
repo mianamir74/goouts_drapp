@@ -17,6 +17,27 @@
 			</array>
 		</dict>
 	</array>
+	<!-- ⚠ ADDED 24 August 2026. THESE WERE MISSING ENTIRELY, AND THAT WAS A
+	     LIVE CRASH, NOT A GAP FOR THE NEW FEATURE.
+
+	     This app has called image_picker for its registration photographs since
+	     it was built (registration_screen.dart, business_registration_screen.dart).
+	     When an iOS app touches the camera or the photo library and Info.plist
+	     carries no usage description, the system does not deny the request — it
+	     TERMINATES THE PROCESS IMMEDIATELY.
+
+	     To the person holding the phone the app simply vanishes at the moment
+	     they tap to take their selfie, and nothing reaches Crashlytics that
+	     names the cause. Every iOS delivery-driver registration would have
+	     died at that step.
+
+	     ⚠ THE TEXT IS SHOWN TO THE USER in the permission dialog and is read by
+	     App Review. It must say WHY, specifically. "This app needs camera
+	     access" is a rejection. -->
+	<key>NSCameraUsageDescription</key>
+	<string>GoOuts needs your camera to photograph your identity document and take a verification selfie, so we can confirm who you are before you start delivering.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GoOuts needs access to your photos so you can choose an existing picture of your identity document or profile photo instead of taking a new one.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

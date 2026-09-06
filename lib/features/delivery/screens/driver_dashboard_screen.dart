@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'new_order_offer_screen.dart';
 import 'dashboard_heatmap_screen.dart';
@@ -22,8 +23,24 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   bool   _isOnline       = false;
   bool   _loadingToggle  = false;
   Map<String, dynamic>? _driverData;
-  Map<String, dynamic>? _pendingOrder;
+
+  // ⚠ TWO SEPARATE THINGS, SPLIT 6 September 2026. Both used to be one
+  // "_pendingOrder" fed by one query that, before today, could never
+  // actually match anything (see _listenForOrders' own comment). Fixing the
+  // query surfaced that the single field was doing two different jobs:
+  //
+  //   _availableOffer  a broadcast order nobody has accepted yet — pops the
+  //                     full-screen NewOrderOfferScreen, is not "mine" until
+  //                     I tap Accept, and must never render as though it is
+  //                     already my job.
+  //   _activeOrder     an order I HAVE accepted — drives the inline
+  //                     "Active order" card on this dashboard, tracked
+  //                     independently of the online toggle because being
+  //                     mid-delivery does not stop just because I go offline.
+  Map<String, dynamic>? _availableOffer;
+  Map<String, dynamic>? _activeOrder;
   StreamSubscription? _orderSub;
+  StreamSubscription? _activeOrderSub;
 
   int    _deliveriesToday = 0;
   double _earnedToday     = 0;
@@ -36,15 +53,21 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   // Weekly bar chart data (Mon–Sun)
   final List<double> _weeklyEarnings = [42, 58, 65, 84, 71, 38, 20];
 
+  static const _activeStatuses = {
+    'driver_heading_to_restaurant',
+    'driver_picked_up',
+  };
+
   @override
   void initState() {
     super.initState();
     _loadDriver();
-    _listenForOrders();
+    _listenForActiveOrder();
   }
 
   @override
   void dispose() {
+    _activeOrderSub?.cancel();
     _orderSub?.cancel();
     super.dispose();
   }
@@ -66,26 +89,87 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
       _cancellationRate = (data['cancellationRate'] ?? 2).toDouble();
       _rating           = (data['rating']          ?? 4.9).toDouble();
     });
+    // Only a driver who is actually online should be woken up with new-order
+    // offers. _listenForOrders() itself has no online check — it is this
+    // call site's job to decide when it runs, same as _toggleOnline below.
+    if (_isOnline) _listenForOrders();
   }
 
-  void _listenForOrders() {
+  // ⚠ NEW 6 September 2026. Runs regardless of the online toggle — a driver
+  // who is mid-delivery is still mid-delivery if they flip themselves
+  // offline, and needs to keep seeing the job. where('driverId','==',uid)
+  // alone, no orderBy, no second equality clause: single-field, no composite
+  // index, status filtered in Dart, same trade-off this codebase makes
+  // everywhere a small per-driver result set makes it cheap.
+  void _listenForActiveOrder() {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
-    // Listen for orders assigned to this driver OR broadcast pending orders
-    _orderSub = _db
+    _activeOrderSub = _db
         .collection('food_orders')
-        .where('status', whereIn: ['driver_assigned', 'pending'])
         .where('driverId', isEqualTo: uid)
-        .limit(1)
+        .limit(10)
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
-      if (snap.docs.isNotEmpty) {
-        final order = {'id': snap.docs.first.id, ...snap.docs.first.data()};
-        setState(() => _pendingOrder = order);
+      final active = snap.docs.where(
+          (d) => _activeStatuses.contains(d.data()['status']));
+      setState(() {
+        _activeOrder = active.isEmpty
+            ? null
+            : {'id': active.first.id, ...active.first.data()};
+      });
+    });
+  }
+
+  // ⚠ REWRITTEN 6 September 2026. Was
+  // where('status', whereIn: ['driver_assigned','pending'])
+  //   .where('driverId', isEqualTo: uid)
+  // — a query that could never match anything, because nothing anywhere ever
+  // wrote a driverId onto an order (see food_dispatch.js's header for the
+  // full chain this was one end of). It compiled, it ran, it just never
+  // returned a document.
+  //
+  // This is a broadcast model: every online driver watches the same pool of
+  // pending, unassigned orders. Firestore's live listener naturally drops an
+  // order from every OTHER driver's results the instant one driver accepts
+  // it (driverId stops being null), so no separate "somebody else took it"
+  // signal is needed here — only inside acceptFoodOrder's own transaction,
+  // for the driver who is mid-tap when that happens.
+  //
+  // declinedBy is filtered in Dart, not in the query — Firestore has no
+  // "array does not contain" filter, and it does not need one here: every
+  // document this query is allowed to return already satisfies
+  // firestore.rules' own read rule (status pending, driverId null), so
+  // narrowing further client-side changes nothing about what was authorised.
+  //
+  // ⚠ SUPPRESSED WHILE _activeOrder IS SET. A driver already mid-delivery
+  // must not be interrupted with a second offer — they cannot act on it
+  // until the first job is done anyway, and the full-screen offer dialog
+  // would cover the active-delivery screen they are supposed to be using.
+  void _listenForOrders() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    _orderSub?.cancel(); // guard against double-subscribing
+    _orderSub = _db
+        .collection('food_orders')
+        .where('status', isEqualTo: 'pending')
+        .where('driverId', isEqualTo: null)
+        .limit(20)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      if (_activeOrder != null) return;
+      final candidates = snap.docs.where((d) {
+        final declinedBy = (d.data()['declinedBy'] as List?) ?? const [];
+        return !declinedBy.contains(uid);
+      });
+      if (candidates.isNotEmpty) {
+        final doc = candidates.first;
+        final order = {'id': doc.id, ...doc.data()};
+        setState(() => _availableOffer = order);
         if (!_offerShowing) _showOrderOffer(order);
       } else {
-        setState(() => _pendingOrder = null);
+        setState(() => _availableOffer = null);
       }
     });
   }
@@ -117,6 +201,13 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
         _isOnline     = value;
         _loadingToggle = false;
       });
+      if (value) {
+        _listenForOrders();
+      } else {
+        _orderSub?.cancel();
+        _orderSub = null;
+        setState(() => _availableOffer = null);
+      }
     } catch (_) {
       setState(() => _loadingToggle = false);
     }
@@ -285,8 +376,8 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
               const SizedBox(height: 16),
 
               // ── Active order card (if assigned) ────────────────────────
-              if (_pendingOrder != null) ...[
-                _ActiveOrderCard(order: _pendingOrder!),
+              if (_activeOrder != null) ...[
+                _ActiveOrderCard(order: _activeOrder!),
                 const SizedBox(height: 16),
               ],
 
@@ -593,6 +684,20 @@ class _ActiveOrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
   const _ActiveOrderCard({required this.order});
 
+  // ⚠ WIRED 6 September 2026. No restaurant in this system has a geocoded
+  // lat/lng yet (see food_dispatch.js's header) so this cannot hand Maps a
+  // pin — only an address string to search for. Google Maps resolves a
+  // search query to the correct place in the vast majority of cases; it is a
+  // real navigation launch, just not turn-by-turn to an exact coordinate.
+  Future<void> _navigateToRestaurant(String name, String address) async {
+    final String query = [name, address].where((s) => s.isNotEmpty).join(', ');
+    if (query.isEmpty) return;
+    final Uri uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     final restaurant = order['restaurantName'] ?? 'Restaurant';
@@ -697,7 +802,8 @@ class _ActiveOrderCard extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () => _navigateToRestaurant(
+                  restaurant.toString(), address.toString()),
               icon: const Icon(Icons.navigation, size: 18),
               label: const Text('Navigate to Restaurant',
                   style: TextStyle(

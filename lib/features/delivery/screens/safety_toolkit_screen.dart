@@ -1,5 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+// ⚠ FLAGGED 6 September 2026, NOT FULLY BUILT — same "flag, don't fake"
+// treatment as host_14's pricing alert. Fixed here: the SOS dialog (was
+// claiming to auto-contact 999 and share location; did neither — now a real
+// tel:999 dialer open, honestly labelled) and Current Location (was a
+// hardcoded fake street address; now the device's real GPS coordinates).
+//
+// NOT fixed, and deliberately not faked: "Tracking Active" (no live-tracking
+// backend exists outside an active delivery), "Voice Monitoring Active" (no
+// audio pipeline, and building one is a consent/privacy/retention decision,
+// not a UI fix), "Share My Trip", "Report a Safety Issue", "Record Audio",
+// and the three Safety Resources links — none has a screen, collection, or
+// backend behind it. All still show but do nothing on tap; none previously
+// had a tap handler at all (not even a no-op) so nothing here regressed.
 class SafetyToolkitScreen extends StatefulWidget {
   const SafetyToolkitScreen({super.key});
 
@@ -9,6 +25,36 @@ class SafetyToolkitScreen extends StatefulWidget {
 
 class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
   bool _voiceActive = true;
+
+  // Real device coordinates, replacing a hardcoded fake address. Falls back
+  // to an honest "not available" rather than another made-up value.
+  String _coords = 'Fetching your location…';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocation();
+  }
+
+  Future<void> _loadLocation() async {
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever ||
+          perm == LocationPermission.denied) {
+        if (mounted) setState(() => _coords = 'Location permission denied');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      setState(() =>
+          _coords = '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}');
+    } catch (_) {
+      if (mounted) setState(() => _coords = 'Location not available');
+    }
+  }
 
   void _triggerSos() {
     showDialog(
@@ -21,7 +67,9 @@ class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
             style: TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text(
-          'This will contact 999 emergency services and share your live location with GoOuts support.\n\nAre you sure?',
+          'Tapping Call 999 opens your phone dialer with 999 ready to '
+          'call. GoOuts does not automatically contact emergency services '
+          'or share your location — you place the call yourself.',
           style: TextStyle(color: Colors.white70, height: 1.5),
         ),
         actions: [
@@ -31,7 +79,10 @@ class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
                 style: TextStyle(color: Colors.white54)),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () async {
+              Navigator.pop(context);
+              await launchUrl(Uri(scheme: 'tel', path: '999'));
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFef4444),
               shape: RoundedRectangleBorder(
@@ -98,9 +149,17 @@ class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
                   _safetyTile(
                     icon: Icons.location_on_outlined,
                     title: 'Current Location',
-                    subtitle: '582 Market St, London EC1A 1BB',
+                    subtitle: _coords,
                     trailing: TextButton(
-                      onPressed: () {},
+                      onPressed: _coords.contains(',')
+                          ? () {
+                              Clipboard.setData(ClipboardData(text: _coords));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Location copied')),
+                              );
+                            }
+                          : null,
                       child: const Text('Copy',
                           style: TextStyle(color: Color(0xFF0392ca))),
                     ),

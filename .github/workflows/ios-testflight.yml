@@ -55,9 +55,19 @@ jobs:
           echo "iOS build number -> $BUILD_NUM"
           cd ios && agvtool new-version -all "$BUILD_NUM"
 
+      # MAPBOX_TOKEN comes from a repository secret, not from the source. The
+      # token used to be hardcoded in lib/services/address_lookup_service.dart
+      # until GitHub push protection blocked a push (GH013) on 13 August 2026.
+      # A Mapbox token is billable and public repos are scraped for them.
+      #
+      # ⚠ IF THE SECRET IS MISSING the build still SUCCEEDS with an empty
+      # string, the app looks normal, and every postcode lookup silently
+      # returns nothing. Add it at Settings > Secrets and variables > Actions.
+
       - name: Build IPA
         run: |
           flutter build ipa \
+            --dart-define=MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }} \
             --release \
             --export-options-plist="$HOME/export_options.plist"
 

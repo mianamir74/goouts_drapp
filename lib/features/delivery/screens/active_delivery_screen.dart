@@ -9,6 +9,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 // cloud_firestore GeoPoint used throughout this screen for driver location.
 // Hide the scanner's version so GeoPoint unambiguously means Firestore's.
 import 'package:mobile_scanner/mobile_scanner.dart' hide GeoPoint;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/location_broadcast_service.dart';
 import 'delivery_verification_screen.dart';
@@ -185,6 +186,17 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
     }
   }
 
+  // ⚠ WIRED 6 September 2026. restaurantPhone did not exist on any order
+  // until food_orders.js's restaurantTerms() started reading it off the
+  // merchant/restaurant record — see that file's comment for where it
+  // comes from and why it may still be empty for a restaurant that has
+  // never set one, hence the null onPressed above rather than launching a
+  // tel: link to nothing.
+  Future<void> _callRestaurant(String phone) async {
+    final Uri uri = Uri(scheme: 'tel', path: phone.trim());
+    await launchUrl(uri);
+  }
+
   /// Placeholder tile used when the restaurant has no usable image.
   ///
   /// Shared by the empty check and the errorBuilder so both paths render the
@@ -207,6 +219,7 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
 
     final restaurant   = _order!['restaurantName']    ?? 'Restaurant';
     final restAddress  = _order!['restaurantAddress'] ?? '';
+    final restPhone    = (_order!['restaurantPhone'] as String?) ?? '';
     final customer     = _order!['customerName']      ?? '';
     final custAddress  = _order!['deliveryAddress']   ?? '';
     final driverFee    = (_order!['driverFee']        ?? 0.0).toDouble();
@@ -444,7 +457,9 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
                             IconButton(
                               icon: const Icon(Icons.phone_outlined,
                                   color: Color(0xFF0392ca), size: 22),
-                              onPressed: () {},
+                              onPressed: restPhone.trim().isEmpty
+                                  ? null
+                                  : () => _callRestaurant(restPhone),
                             ),
                           ],
                         ),
