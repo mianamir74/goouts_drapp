@@ -44,7 +44,19 @@ dependencies:
   geolocator: ^13.0.2
   flutter_rating_bar: ^4.0.1
   cloud_functions: ^6.3.3
-  mobile_scanner: ^6.0.0
+  # ⚠ WAS ^6.0.0 UNTIL 6 September 2026 — every CI build ever run had failed
+  # (all 13 runs, since the very first commit) with:
+  #   CocoaPods could not find compatible versions for pod "GoogleMLKit/MLKitCore"
+  # mobile_scanner 6.x pins GoogleMLKit/BarcodeScanning (= 7.0.0) on iOS, while
+  # google_mlkit_face_detection (below) pins GoogleMLKit/FaceDetection which
+  # needs MLKitCore (= 9.0.0) — two exact, incompatible pins on the same
+  # underlying pod. mobile_scanner 7.x dropped GoogleMLKit entirely on
+  # iOS/macOS in favour of Apple's own Vision API, which removes the
+  # conflicting pin altogether rather than needing it to match by luck.
+  # Code using this package (active_delivery_screen.dart) only touches the
+  # stable MobileScannerController/MobileScanner/onDetect/BarcodeCapture API,
+  # unchanged across this bump — nothing else needed to change.
+  mobile_scanner: ^7.0.0
   firebase_database: ^12.4.4
 
 dev_dependencies:
