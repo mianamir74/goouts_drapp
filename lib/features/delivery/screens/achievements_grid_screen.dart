@@ -85,28 +85,56 @@ class _AchievementsGridScreenState extends State<AchievementsGridScreen> {
       final referrals = (d['driverReferralCount'] ?? 0) as int;
       final tier = (d['tier'] as String?) ?? 'Bronze';
 
+      // ⚠ ADDED 8 September 2026, building the Food Delivery Drivers admin
+      // section. These six numbers used to be hardcoded here — an admin
+      // wanting to change "First 50" to "First 40" needed an app release.
+      // config/food_driver_rewards now holds the real values; this is a
+      // BEST-EFFORT read on its own try/catch, separate from the food_drivers
+      // read above, so a config outage degrades to the shipped defaults
+      // rather than blanking the whole achievements screen — the same
+      // "flag don't fake, but don't fail the page either" rule applied
+      // everywhere else this session.
+      num first50 = 50, first250 = 250, fiveStar = 4.8, reliableRate = 90, teamBuilder = 5;
+      String goldTierName = 'Gold';
+      try {
+        final cfgDoc = await FirebaseFirestore.instance
+            .collection('config').doc('food_driver_rewards').get();
+        final at = cfgDoc.data()?['achievementThresholds'];
+        if (at is Map) {
+          first50 = (at['first50Deliveries'] as num?) ?? first50;
+          first250 = (at['first250Deliveries'] as num?) ?? first250;
+          fiveStar = (at['fiveStarRating'] as num?) ?? fiveStar;
+          reliableRate = (at['reliableAcceptanceRate'] as num?) ?? reliableRate;
+          teamBuilder = (at['teamBuilderReferrals'] as num?) ?? teamBuilder;
+          goldTierName = (at['goldTierName'] as String?) ?? goldTierName;
+        }
+      } catch (_) {
+        // Defaults above already match what this screen shipped with —
+        // nothing to do here but keep them.
+      }
+
       if (!mounted) return;
       setState(() {
         _tier = tier;
         _achievements = [
-          _Achievement(title: 'First 50', description: '50 completed deliveries',
+          _Achievement(title: 'First $first50', description: '$first50 completed deliveries',
               icon: Icons.two_wheeler_rounded, color: const Color(0xFF0284C7),
-              current: totalDeliveries, target: 50),
-          _Achievement(title: 'First 250', description: '250 completed deliveries',
+              current: totalDeliveries, target: first50),
+          _Achievement(title: 'First $first250', description: '$first250 completed deliveries',
               icon: Icons.shield_rounded, color: const Color(0xFFEA580C),
-              current: totalDeliveries, target: 250),
-          _Achievement(title: 'Five Star', description: 'Maintain a 4.8+ rating',
+              current: totalDeliveries, target: first250),
+          _Achievement(title: 'Five Star', description: 'Maintain a $fiveStar+ rating',
               icon: Icons.star_rounded, color: const Color(0xFFF59E0B),
-              current: rating, target: 4.8),
-          _Achievement(title: 'Reliable Partner', description: '90%+ order acceptance rate',
+              current: rating, target: fiveStar),
+          _Achievement(title: 'Reliable Partner', description: '$reliableRate%+ order acceptance rate',
               icon: Icons.verified_rounded, color: const Color(0xFF16A34A),
-              current: acceptanceRate, target: 90),
-          _Achievement(title: 'Team Builder', description: 'Refer 5 drivers who join GoOuts',
+              current: acceptanceRate, target: reliableRate),
+          _Achievement(title: 'Team Builder', description: 'Refer $teamBuilder drivers who join GoOuts',
               icon: Icons.groups_rounded, color: const Color(0xFF6366F1),
-              current: referrals, target: 5),
-          _Achievement(title: 'Gold Tier', description: 'Reach Gold driver tier',
+              current: referrals, target: teamBuilder),
+          _Achievement(title: '$goldTierName Tier', description: 'Reach $goldTierName driver tier',
               icon: Icons.emoji_events_rounded, color: const Color(0xFFEA580C),
-              current: tier == 'Gold' ? 1 : 0, target: 1),
+              current: tier == goldTierName ? 1 : 0, target: 1),
         ];
         _loading = false;
       });
