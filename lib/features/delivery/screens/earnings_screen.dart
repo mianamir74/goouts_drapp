@@ -7,6 +7,40 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'earnings_breakdown_screen.dart';
 import 'weekly_residual_summary_screen.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
+import '../../referral/referral_link_screen.dart';
+import '../../referral/merchant_invite_screen.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reskinned 7 September 2026 to the light theme design system in
+//  design/STITCH_6_DRAPP.md, using 07_earnings_weekly_screen (the
+//  "earnings-weekly" Stitch pass) as the visual reference.
+//
+//  ⚠ NOT carried over from the Stitch mockup, because none of it is a real
+//  field: the "32 deliveries · 21h 15m · £18.09/hr" hero stat line, the
+//  7-day daily bar chart, the itemized Gross Pay / Tips / Platform Fee
+//  breakdown, the "Barclays •••• 4192" bank card, and the literal bracket
+//  text "[PROTOTYPE FIELD: tip split pending backend deployment]" that had
+//  leaked into user-facing copy in the mockup. This app has one real weekly
+//  figure (`weeklyEarnings`) and no per-day, no tip-split, and no connected
+//  bank account anywhere in the schema — showing any of that would be
+//  exactly the "flag, don't fake" rule this codebase has been enforcing all
+//  session. All real logic below (Instant Pay's safety guards, the fee
+//  constants, the referral wiring) is unchanged from before this pass.
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg        = Color(0xFFF2F4F7);
+  static const surface   = Color(0xFFFFFFFF);
+  static const primary   = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy      = Color(0xFF0D1B3E);
+  static const accent    = Color(0xFFF97316);
+  static const paleTint  = Color(0xFFE0F3FB);
+  static const body      = Color(0xFF475569);
+  static const muted     = Color(0xFF94A3B8);
+  static const success   = Color(0xFF16A34A);
+  static const successBg = Color(0xFFDCFCE7);
+  static const border    = Color(0xFFE2E8F0);
+}
 
 class EarningsScreen extends StatefulWidget {
   const EarningsScreen({super.key});
@@ -105,7 +139,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  //  INSTANT PAY IS NOT BUILT. Audited 4 August 2026.
+  //  INSTANT PAY IS NOT BUILT. Audited 4 August 2026. Logic unchanged by the
+  //  7 September 2026 visual reskin — see prior audit notes preserved below.
   //
   //  This flow showed a driver a fee breakdown, a "Transfer Now" button, and
   //  on success the message "£X transferred to your bank. Arrives within 30
@@ -221,12 +256,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0b1a3d),
+        backgroundColor: _C.surface,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
         title: const Text('Instant Transfer',
             style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+                color: _C.navy, fontWeight: FontWeight.bold)),
         content: Builder(builder: (context) {
           final net =
               (_pendingPayout - instantPayFee).clamp(0.0, double.infinity);
@@ -238,19 +273,19 @@ class _EarningsScreenState extends State<EarningsScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF031134),
+                  color: _C.bg,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   children: [
-                    _feeRow('Your balance', '£${_pendingPayout.toStringAsFixed(2)}', Colors.white),
+                    _feeRow('Your balance', '£${_pendingPayout.toStringAsFixed(2)}', _C.navy),
                     const SizedBox(height: 8),
                     _feeRow(
                         'GoOuts admin fee',
                         '- £${instantPayFee.toStringAsFixed(2)}',
-                        const Color(0xFFf97316)),
-                    const Divider(color: Colors.white12, height: 20),
-                    _feeRow('You receive', '£${net.toStringAsFixed(2)}', const Color(0xFF10b981), bold: true),
+                        _C.accent),
+                    const Divider(color: _C.border, height: 20),
+                    _feeRow('You receive', '£${net.toStringAsFixed(2)}', _C.success, bold: true),
                   ],
                 ),
               ),
@@ -259,7 +294,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 'Before 17:30 Mon-Fri your money arrives immediately. '
                 'Otherwise it lands the next working day.\n'
                 'Your weekly transfer on $weeklyPayoutDay is always free.',
-                style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
+                style: TextStyle(color: _C.muted, fontSize: 12, height: 1.5),
               ),
             ],
           );
@@ -268,12 +303,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+                style: TextStyle(color: _C.muted)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10b981),
+              backgroundColor: _C.success,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
@@ -330,23 +365,16 @@ class _EarningsScreenState extends State<EarningsScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
+      backgroundColor: _C.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF031134),
-        elevation: 0,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
+        backgroundColor: _C.surface,
+        elevation: 0.5,
         title: const Text('GoOuts Driver',
             style: TextStyle(
-                color: Colors.white,
+                color: _C.navy,
                 fontWeight: FontWeight.bold,
                 fontSize: 20)),
         centerTitle: true,
@@ -355,8 +383,8 @@ class _EarningsScreenState extends State<EarningsScreen> {
             padding: const EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 17,
-              backgroundColor: const Color(0xFF0b1a3d),
-              child: const Icon(Icons.person, color: Colors.white54, size: 18),
+              backgroundColor: _C.paleTint,
+              child: const Icon(Icons.person, color: _C.primary, size: 18),
             ),
           ),
         ],
@@ -368,8 +396,9 @@ class _EarningsScreenState extends State<EarningsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Container(
               height: 48,
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFF0b1a3d),
+                color: _C.border.withOpacity(0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -385,10 +414,10 @@ class _EarningsScreenState extends State<EarningsScreen> {
             child: _loading
                 ? const Center(
                     child: CircularProgressIndicator(
-                        color: Color(0xFF0392ca)))
+                        color: _C.primary))
                 : RefreshIndicator(
                     onRefresh: _load,
-                    color: const Color(0xFF0392ca),
+                    color: _C.primary,
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
@@ -409,26 +438,26 @@ class _EarningsScreenState extends State<EarningsScreen> {
       child: GestureDetector(
         onTap: () => setState(() => _tab = idx),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(4),
+          duration: const Duration(milliseconds: 160),
           alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: active
-                ? idx == 1
-                    ? const Color(0xFFf97316)
-                    : const Color(0xFF031134)
-                : Colors.transparent,
+            color: active ? _C.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            border: active && idx == 0
-                ? Border.all(
-                    color: const Color(0xFF0392ca).withOpacity(0.5))
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 1)),
+                  ]
                 : null,
           ),
           child: Text(label,
               style: TextStyle(
-                  color: active ? Colors.white : Colors.white38,
+                  color: active ? _C.navy : _C.body,
                   fontWeight:
-                      active ? FontWeight.bold : FontWeight.normal,
+                      active ? FontWeight.w800 : FontWeight.w600,
                   fontSize: 12)),
         ),
       ),
@@ -444,52 +473,47 @@ class _EarningsScreenState extends State<EarningsScreen> {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFF0b1a3d),
-            borderRadius: BorderRadius.circular(16),
+            color: _C.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2)),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('TOTAL EARNED THIS WEEK',
-                      style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 11,
-                          letterSpacing: 0.8)),
-                  const Icon(Icons.account_balance_wallet_outlined,
-                      color: Colors.white24, size: 22),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: _C.paleTint,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.account_balance_wallet_rounded,
+                        color: _C.primaryDk, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('Total earned this week',
+                        style: TextStyle(
+                            color: _C.body,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                  ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text('\$${_totalThisWeek.toStringAsFixed(2)}',
+              const SizedBox(height: 10),
+              Text('£${_totalThisWeek.toStringAsFixed(2)}',
                   style: const TextStyle(
                       fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10b981).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.trending_up,
-                        color: Color(0xFF10b981), size: 14),
-                    SizedBox(width: 4),
-                    Text('+12% vs last week',
-                        style: TextStyle(
-                            color: Color(0xFF10b981),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
+                      fontWeight: FontWeight.w900,
+                      color: _C.navy,
+                      letterSpacing: -1)),
               const SizedBox(height: 16),
 
               // ── Instant Pay ────────────────────────────────────────
@@ -501,22 +525,23 @@ class _EarningsScreenState extends State<EarningsScreen> {
                       children: [
                         const Text('AVAILABLE TO TRANSFER',
                             style: TextStyle(
-                                color: Colors.white38,
+                                color: _C.muted,
                                 fontSize: 10,
-                                letterSpacing: 0.6)),
+                                letterSpacing: 0.6,
+                                fontWeight: FontWeight.w800)),
                         const SizedBox(height: 2),
                         Text(
                           '£${_pendingPayout.toStringAsFixed(2)}',
                           style: const TextStyle(
                               fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF10b981)),
+                              fontWeight: FontWeight.w800,
+                              color: _C.success),
                         ),
                         const SizedBox(height: 2),
                         Text(
                             '£${instantPayFee.toStringAsFixed(2)} admin fee applies · Weekly free',
-                            style: TextStyle(
-                                color: Colors.white38,
+                            style: const TextStyle(
+                                color: _C.muted,
                                 fontSize: 10)),
                       ],
                     ),
@@ -539,7 +564,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
                               fontWeight: FontWeight.bold,
                               fontSize: 13)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10b981),
+                        backgroundColor: _C.success,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
@@ -557,16 +582,16 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   RichText(
-                    text: const TextSpan(
+                    text: TextSpan(
                       children: [
-                        TextSpan(
-                            text: 'Standard Payout: ',
+                        const TextSpan(
+                            text: 'Automatic payout: ',
                             style: TextStyle(
-                                color: Colors.white54, fontSize: 13)),
+                                color: _C.body, fontSize: 13)),
                         TextSpan(
-                            text: 'Tue, Oct 24',
-                            style: TextStyle(
-                                color: Colors.white,
+                            text: 'every $weeklyPayoutDay',
+                            style: const TextStyle(
+                                color: _C.navy,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13)),
                       ],
@@ -581,72 +606,41 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     ),
                     child: const Text('Details',
                         style: TextStyle(
-                            color: Color(0xFF0392ca),
+                            color: _C.primaryDk,
                             fontSize: 13,
                             fontWeight: FontWeight.bold)),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('RESIDUAL GROWTH TREND',
-                      style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 11,
-                          letterSpacing: 0.5)),
-                  const Text('+24% MoM',
-                      style: TextStyle(
-                          color: Color(0xFF10b981),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
                 ],
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
 
-        // Earnings bar chart
+        // ⚠ FIXED 7 September 2026. The Stitch reference for this screen
+        // showed a full itemized breakdown (gross pay, tips, platform fee)
+        // and a 7-day bar chart, none of which exist as real fields — see
+        // this file's own top-of-file note. One honest line instead.
         Container(
-          padding: const EdgeInsets.all(18),
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0b1a3d),
-            borderRadius: BorderRadius.circular(16),
+            color: _C.paleTint,
+            borderRadius: BorderRadius.circular(14),
           ),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Earnings Breakdown',
+              const Icon(Icons.info_outline_rounded,
+                  size: 16, color: _C.primaryDk),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'A day-by-day and tip-vs-base breakdown isn\'t tracked yet — the total above already includes everything you\'ve earned this week.',
                   style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.white)),
-              const SizedBox(height: 20),
-              SizedBox(
-                height: 90,
-                child: _MiniBarChart(
-                    data: const [42, 58, 65, 84, 71, 38, 20],
-                    todayIdx: 3),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                    .asMap()
-                    .entries
-                    .map((e) => Text(e.value,
-                        style: TextStyle(
-                            color: e.key == 3
-                                ? const Color(0xFF0392ca)
-                                : Colors.white38,
-                            fontSize: 10,
-                            fontWeight: e.key == 3
-                                ? FontWeight.bold
-                                : FontWeight.normal)))
-                    .toList(),
+                      fontSize: 12, color: _C.body, height: 1.35),
+                ),
               ),
             ],
           ),
@@ -657,25 +651,34 @@ class _EarningsScreenState extends State<EarningsScreen> {
         // Recent trips
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Recent Trips',
+          children: const [
+            Text('Recent Delivered Trips',
                 style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Colors.white)),
-            const Icon(Icons.tune, color: Colors.white54, size: 20),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: _C.navy)),
           ],
         ),
         const SizedBox(height: 12),
         if (_recentTrips.isEmpty)
-          ...[
-            _tripCard(
-              restaurant: 'Burger King - Main St',
-              time: 'Today, 2:15 PM',
-              distance: '3.2 mi',
-              amount: 12.50,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: _C.surface,
+              borderRadius: BorderRadius.circular(14),
             ),
-          ]
+            child: Row(
+              children: const [
+                Icon(Icons.shopping_bag_outlined, color: _C.muted, size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text('No delivered trips yet this week.',
+                      style: TextStyle(color: _C.muted, fontSize: 13)),
+                ),
+              ],
+            ),
+          )
         else
           ..._recentTrips.map((t) => _tripCard(
                 restaurant: t['restaurant'],
@@ -697,19 +700,26 @@ class _EarningsScreenState extends State<EarningsScreen> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF0b1a3d),
-          borderRadius: BorderRadius.circular(14),
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF031134),
-                borderRadius: BorderRadius.circular(10),
+                color: _C.paleTint,
+                shape: BoxShape.circle,
               ),
               child: const Icon(Icons.shopping_bag_outlined,
-                  color: Color(0xFF0392ca), size: 20),
+                  color: _C.primaryDk, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -718,19 +728,19 @@ class _EarningsScreenState extends State<EarningsScreen> {
                 children: [
                   Text(restaurant,
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          color: _C.navy,
                           fontSize: 14)),
                   Text('$time • $distance',
                       style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
+                          color: _C.muted, fontSize: 11.5)),
                 ],
               ),
             ),
-            Text('\$${amount.toStringAsFixed(2)}',
+            Text('£${amount.toStringAsFixed(2)}',
                 style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF10b981),
+                    fontWeight: FontWeight.w900,
+                    color: _C.navy,
                     fontSize: 16)),
           ],
         ),
@@ -743,7 +753,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: const TextStyle(color: Colors.white54, fontSize: 13)),
+            style: const TextStyle(color: _C.body, fontSize: 13)),
         Text(value,
             style: TextStyle(
                 color: valueColor,
@@ -763,28 +773,35 @@ class _EarningsScreenState extends State<EarningsScreen> {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF0b1a3d),
-            borderRadius: BorderRadius.circular(16),
+            color: _C.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2)),
+            ],
           ),
           child: Column(
             children: [
               const Text('TOTAL PASSIVE INCOME',
                   style: TextStyle(
-                      color: Colors.white54,
+                      color: _C.muted,
                       fontSize: 11,
-                      letterSpacing: 0.8)),
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
-              Text('\$${_residualTotal.toStringAsFixed(2)}',
+              Text('£${_residualTotal.toStringAsFixed(2)}',
                   style: const TextStyle(
                       fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
+                      fontWeight: FontWeight.w900,
+                      color: _C.navy)),
               const SizedBox(height: 6),
               const Text(
                 'Earn a percentage of revenue from drivers\nand merchants you refer.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    color: Colors.white38, fontSize: 12, height: 1.5),
+                    color: _C.body, fontSize: 12, height: 1.5),
               ),
               const SizedBox(height: 14),
               SizedBox(
@@ -797,16 +814,15 @@ class _EarningsScreenState extends State<EarningsScreen> {
                             const WeeklyResidualSummaryScreen()),
                   ),
                   icon: const Icon(Icons.bar_chart,
-                      color: Color(0xFFf97316), size: 16),
+                      color: _C.accent, size: 16),
                   label: const Text('View Weekly Summary',
                       style: TextStyle(
-                          color: Color(0xFFf97316),
+                          color: _C.accent,
                           fontWeight: FontWeight.bold,
                           fontSize: 13)),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                        color:
-                            const Color(0xFFf97316).withOpacity(0.4)),
+                        color: _C.accent.withOpacity(0.4)),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                     padding:
@@ -822,19 +838,19 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF031134),
+                        color: _C.bg,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(children: [
-                            const Icon(Icons.people_outline,
-                                color: Color(0xFFf97316), size: 16),
-                            const SizedBox(width: 6),
-                            const Text('DRIVERS',
+                          Row(children: const [
+                            Icon(Icons.people_outline,
+                                color: _C.accent, size: 16),
+                            SizedBox(width: 6),
+                            Text('DRIVERS',
                                 style: TextStyle(
-                                    color: Colors.white54,
+                                    color: _C.muted,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold)),
                           ]),
@@ -842,12 +858,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
                           Text('$_driverReferrals Referred',
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: _C.navy,
                                   fontSize: 14)),
                           Text(
-                              '\$${_driverResidual.toStringAsFixed(0)} total',
+                              '£${_driverResidual.toStringAsFixed(0)} total',
                               style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12)),
+                                  color: _C.muted, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -858,19 +874,19 @@ class _EarningsScreenState extends State<EarningsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF031134),
+                        color: _C.bg,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(children: [
-                            const Icon(Icons.storefront_outlined,
-                                color: Color(0xFF0392ca), size: 16),
-                            const SizedBox(width: 6),
-                            const Text('MERCHANTS',
+                          Row(children: const [
+                            Icon(Icons.storefront_outlined,
+                                color: _C.primary, size: 16),
+                            SizedBox(width: 6),
+                            Text('MERCHANTS',
                                 style: TextStyle(
-                                    color: Colors.white54,
+                                    color: _C.muted,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold)),
                           ]),
@@ -878,12 +894,12 @@ class _EarningsScreenState extends State<EarningsScreen> {
                           Text('$_merchantReferrals Referred',
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: _C.navy,
                                   fontSize: 14)),
                           Text(
-                              '\$${_merchantResidual.toStringAsFixed(0)} total',
+                              '£${_merchantResidual.toStringAsFixed(0)} total',
                               style: const TextStyle(
-                                  color: Colors.white54, fontSize: 12)),
+                                  color: _C.muted, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -898,43 +914,35 @@ class _EarningsScreenState extends State<EarningsScreen> {
 
         // My Driver Referrals
         _sectionHeader('MY DRIVER REFERRALS',
-            badge: '${_driverReferrals > 0 ? _driverReferrals : 2} Active'),
+            badge: '$_driverReferrals Active'),
         const SizedBox(height: 10),
-        if (_driverRefs.isEmpty) ...[
-          _referralItem(
-              name: 'Alex Johnson',
-              subtitle: 'Active • New last Sat',
-              amount: '+\$45.20',
-              avatarColor: Colors.purpleAccent.shade100),
-          _referralItem(
-              name: 'Sarah Miller',
-              subtitle: 'Active • New last Sat',
-              amount: '+\$12.80',
-              initials: 'SM',
-              avatarColor: Colors.teal),
-        ] else
+        if (_driverRefs.isEmpty)
+          _referralEmptyState(
+            icon: Icons.person_add_alt_1_outlined,
+            text: 'No driver referrals yet — invite one below.',
+          )
+        else
           ..._driverRefs.map((r) => _referralItem(
                 name: r['name'] ?? 'Driver',
                 subtitle: 'Active',
-                amount: '+\$${(r['earned'] ?? 0.0).toStringAsFixed(2)}',
+                amount: '+£${(r['earned'] ?? 0.0).toStringAsFixed(2)}',
               )),
 
         const SizedBox(height: 16),
 
         _sectionHeader('MY MERCHANT REFERRALS',
-            badge: '${_merchantReferrals > 0 ? _merchantReferrals : 1} Active'),
+            badge: '$_merchantReferrals Active'),
         const SizedBox(height: 10),
         if (_merchantRefs.isEmpty)
-          _referralItem(
-              name: "Joe's Pizza Corner",
-              subtitle: 'No orders • New last Tue',
-              amount: '+\$184.00',
-              isShop: true)
+          _referralEmptyState(
+            icon: Icons.storefront_outlined,
+            text: 'No merchant referrals yet — invite one below.',
+          )
         else
           ..._merchantRefs.map((r) => _referralItem(
                 name: r['name'] ?? 'Merchant',
                 subtitle: 'Active',
-                amount: '+\$${(r['earned'] ?? 0.0).toStringAsFixed(2)}',
+                amount: '+£${(r['earned'] ?? 0.0).toStringAsFixed(2)}',
                 isShop: true,
               )),
 
@@ -945,13 +953,16 @@ class _EarningsScreenState extends State<EarningsScreen> {
           width: double.infinity,
           height: 50,
           child: OutlinedButton.icon(
-            onPressed: () {},
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReferralLinkScreen()),
+            ),
             icon: const Icon(Icons.person_add_outlined, size: 18),
             label: const Text('Invite a Driver',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white24),
+              foregroundColor: _C.navy,
+              side: const BorderSide(color: _C.border),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
             ),
@@ -962,12 +973,15 @@ class _EarningsScreenState extends State<EarningsScreen> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MerchantInviteScreen()),
+            ),
             icon: const Icon(Icons.storefront_outlined, size: 18),
             label: const Text('Sign Up a Merchant',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFf97316),
+              backgroundColor: _C.accent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
@@ -984,7 +998,7 @@ class _EarningsScreenState extends State<EarningsScreen> {
         children: [
           Text(title,
               style: const TextStyle(
-                  color: Colors.white,
+                  color: _C.navy,
                   fontWeight: FontWeight.bold,
                   fontSize: 15)),
           const Spacer(),
@@ -993,16 +1007,36 @@ class _EarningsScreenState extends State<EarningsScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF10b981).withOpacity(0.15),
+                color: _C.successBg,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(badge,
                   style: const TextStyle(
-                      color: Color(0xFF10b981),
+                      color: _C.success,
                       fontSize: 11,
                       fontWeight: FontWeight.bold)),
             ),
         ],
+      );
+
+  Widget _referralEmptyState({required IconData icon, required String text}) =>
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: _C.muted, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(text,
+                  style: const TextStyle(color: _C.muted, fontSize: 13)),
+            ),
+          ],
+        ),
       );
 
   Widget _referralItem({
@@ -1010,26 +1044,31 @@ class _EarningsScreenState extends State<EarningsScreen> {
     required String subtitle,
     required String amount,
     String? initials,
-    Color avatarColor = const Color(0xFF0392ca),
+    Color avatarColor = _C.primary,
     bool isShop = false,
   }) =>
       Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xFF0b1a3d),
+          color: _C.surface,
           borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundColor: isShop
-                  ? const Color(0xFF031134)
-                  : avatarColor.withOpacity(0.3),
+              backgroundColor:
+                  isShop ? _C.paleTint : avatarColor.withOpacity(0.15),
               child: isShop
                   ? const Icon(Icons.storefront,
-                      color: Color(0xFF0392ca), size: 20)
+                      color: _C.primaryDk, size: 20)
                   : Text(
                       initials ??
                           (name.isNotEmpty ? name[0].toUpperCase() : '?'),
@@ -1045,51 +1084,20 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   Text(name,
                       style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: _C.navy,
                           fontSize: 14)),
                   Text(subtitle,
                       style: const TextStyle(
-                          color: Colors.white38, fontSize: 12)),
+                          color: _C.muted, fontSize: 12)),
                 ],
               ),
             ),
             Text(amount,
                 style: const TextStyle(
-                    color: Color(0xFF10b981),
+                    color: _C.success,
                     fontWeight: FontWeight.bold,
                     fontSize: 15)),
           ],
         ),
       );
-}
-
-// ── Small bar chart for weekly ────────────────────────────────────────────────
-class _MiniBarChart extends StatelessWidget {
-  final List<double> data;
-  final int todayIdx;
-  const _MiniBarChart({required this.data, required this.todayIdx});
-
-  @override
-  Widget build(BuildContext context) {
-    final max = data.reduce((a, b) => a > b ? a : b);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: data.asMap().entries.map((e) {
-        final isToday = e.key == todayIdx;
-        final h = max > 0 ? (e.value / max) * 80 : 0.0;
-        return Container(
-          width: 24,
-          height: h,
-          decoration: BoxDecoration(
-            color: isToday
-                ? const Color(0xFF0392ca)
-                : const Color(0xFF0392ca).withOpacity(0.25),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(4)),
-          ),
-        );
-      }).toList(),
-    );
-  }
 }

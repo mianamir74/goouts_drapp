@@ -2,6 +2,47 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reskinned 7 September 2026 to the light theme design system in
+//  design/STITCH_6_DRAPP.md, using 06_order_history_screen as the visual
+//  reference.
+//
+//  ⚠ FIXED 7 September 2026. `_demoList()` used to render three entirely
+//  fake orders (Burger King, Starbucks, Taco Bell — with a fake cancelled
+//  Taco Bell order) permanently whenever a driver's real order list was
+//  empty, in $ when the rest of the app is £. Same "flag, don't fake"
+//  pattern already fixed in earnings_screen.dart and referral_link_screen
+//  earlier this session. Replaced with an honest empty state.
+//
+//  ⚠ NOT carried over from the Stitch mockup: the "£412.80 October
+//  Activity" summary card with its 6-bar sparkline (no per-day earnings
+//  breakdown exists — see driver_dashboard_screen.dart's identical note),
+//  the fare-breakdown modal's "Base Trip Fare" / "Dynamic Demand Boost"
+//  split (there is one flat `driverFee` field, not a base+boost split —
+//  see design/DRIVER_PAY_ALGORITHM_SPEC.md), and the "£0.00 (0%) Platform
+//  Courier Fee" claim (whether GoOuts takes a commission at all is an open
+//  business decision, not a settled fact). The activity summary below is
+//  computed instead from the real orders this screen already loads, and
+//  the breakdown modal only shows the two fields that are real: delivery
+//  fee and tip.
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg       = Color(0xFFF2F4F7);
+  static const surface  = Color(0xFFFFFFFF);
+  static const primary  = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy     = Color(0xFF0D1B3E);
+  static const accent   = Color(0xFFF97316);
+  static const paleTint = Color(0xFFE0F3FB);
+  static const softBlueBg = Color(0xFFEFF5FD);
+  static const body     = Color(0xFF475569);
+  static const muted    = Color(0xFF94A3B8);
+  static const success  = Color(0xFF16A34A);
+  static const successBg = Color(0xFFDCFCE7);
+  static const error    = Color(0xFFEF4444);
+  static const border   = Color(0xFFE2E8F0);
+}
+
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
 
@@ -53,6 +94,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     setState(() {
       _orders = snap.docs.map((doc) {
         final d = doc.data();
+        final items = (d['items'] as List?)?.cast<Map>() ?? const [];
         return {
           'id':         doc.id,
           'restaurant': d['restaurantName']  ?? 'Restaurant',
@@ -60,6 +102,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           'distance':   d['distance']        ?? '—',
           'amount':     (d['driverFee']      ?? 0.0).toDouble(),
           'tip':        (d['driverTip']      ?? 0.0).toDouble(),
+          'itemCount':  items.length,
           'orderId':    d['orderId']         ?? doc.id.substring(0, 4).toUpperCase(),
           'status':     d['status']          ?? 'delivered',
           'cancelled':  d['status'] == 'cancelled',
@@ -79,32 +122,130 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     return '$h:$m $ap';
   }
 
+  void _showBreakdown(Map<String, dynamic> o) {
+    final amount = (o['amount'] ?? 0.0) as double;
+    final tip    = (o['tip'] ?? 0.0) as double;
+    final total  = amount + tip;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(22),
+        decoration: const BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(o['restaurant'] ?? '',
+                          style: const TextStyle(
+                              fontSize: 17, fontWeight: FontWeight.w700, color: _C.navy)),
+                      const SizedBox(height: 2),
+                      Text('${o['orderId']} • ${o['time']}',
+                          style: const TextStyle(fontSize: 12.5, color: _C.body)),
+                    ],
+                  ),
+                ),
+                Text('£${total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.w800, color: _C.navy)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 10),
+            _fareRow('Delivery fee', '£${amount.toStringAsFixed(2)}'),
+            if (tip > 0) ...[
+              const SizedBox(height: 8),
+              _fareRow('Customer tip', '+£${tip.toStringAsFixed(2)}'),
+            ],
+            const SizedBox(height: 14),
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Total paid to you',
+                    style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700, color: _C.navy)),
+                Text('£${total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w800, color: _C.primary)),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _C.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Close',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fareRow(String label, String value) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13.5, color: _C.body)),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 13.5, fontWeight: FontWeight.w600, color: _C.navy)),
+        ],
+      );
+
   @override
   Widget build(BuildContext context) {
+    final delivered = _orders.where((o) => o['cancelled'] != true).toList();
+    final totalEarned = delivered.fold<double>(
+        0, (sum, o) => sum + (o['amount'] as double) + (o['tip'] as double));
+    final avgPerDrop = delivered.isNotEmpty ? totalEarned / delivered.length : 0.0;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
+      backgroundColor: _C.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF031134),
-        elevation: 0,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
+        backgroundColor: _C.surface,
+        elevation: 0.5,
         title: const Text('GoOuts Driver',
             style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20)),
+                color: _C.navy, fontWeight: FontWeight.bold, fontSize: 20)),
         centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 17,
-              backgroundColor: const Color(0xFF0b1a3d),
-              child: const Icon(Icons.person, color: Colors.white54, size: 18),
+              backgroundColor: _C.paleTint,
+              child: const Icon(Icons.person, color: _C.primary, size: 18),
             ),
           ),
         ],
@@ -113,12 +254,15 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(18, 14, 18, 14),
+            padding: EdgeInsets.fromLTRB(18, 14, 18, 4),
             child: Text('Order History',
                 style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
+                    fontSize: 24, fontWeight: FontWeight.bold, color: _C.navy)),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(18, 0, 18, 14),
+            child: Text('Your delivered and cancelled orders',
+                style: TextStyle(fontSize: 13, color: _C.body)),
           ),
 
           // ── Filter chips ─────────────────────────────────────────
@@ -139,22 +283,16 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 22, vertical: 11),
                     decoration: BoxDecoration(
-                      color: active
-                          ? const Color(0xFF0392ca)
-                          : const Color(0xFF0b1a3d),
+                      color: active ? _C.primary : _C.surface,
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
-                        color: active
-                            ? Colors.transparent
-                            : Colors.white12,
+                        color: active ? Colors.transparent : _C.border,
                       ),
                     ),
                     child: Text(e.value,
                         style: TextStyle(
-                            color: active ? Colors.white : Colors.white70,
-                            fontWeight: active
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            color: active ? Colors.white : _C.body,
+                            fontWeight: active ? FontWeight.bold : FontWeight.normal,
                             fontSize: 14)),
                   ),
                 );
@@ -162,22 +300,90 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // ── Activity summary (computed from real loaded orders) ─────
+          if (!_loading && _orders.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _C.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _C.softBlueBg,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.calendar_month_outlined,
+                            color: _C.primary, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_filters[_filterIdx].toUpperCase(),
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: _C.body,
+                                  letterSpacing: 0.5)),
+                          const SizedBox(height: 2),
+                          Text('${delivered.length} deliveries',
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w700, color: _C.navy)),
+                        ],
+                      ),
+                    ]),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text('Earned',
+                            style: TextStyle(fontSize: 12, color: _C.body)),
+                        Text('£${totalEarned.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: _C.navy,
+                                letterSpacing: -0.5)),
+                        if (delivered.isNotEmpty)
+                          Text('Avg £${avgPerDrop.toStringAsFixed(2)} / drop',
+                              style: const TextStyle(fontSize: 11.5, color: _C.muted)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 14),
 
           // ── Orders list ──────────────────────────────────────────
           Expanded(
             child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFF0392ca)))
+                ? const Center(child: CircularProgressIndicator(color: _C.primary))
                 : RefreshIndicator(
                     onRefresh: _load,
-                    color: const Color(0xFF0392ca),
+                    color: _C.primary,
                     child: _orders.isEmpty
-                        ? _demoList()
+                        ? _emptyState()
                         : ListView.builder(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 18),
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
                             itemCount: _orders.length,
                             itemBuilder: (_, i) => _orderCard(_orders[i]),
                           ),
@@ -188,37 +394,22 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     );
   }
 
-  // Demo list shown when Firestore returns nothing
-  Widget _demoList() => ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 18),
+  Widget _emptyState() => ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 40),
         children: [
-          _orderCard({
-            'restaurant': 'Burger King - Downtown',
-            'time': '10:45 AM',
-            'distance': '2.4',
-            'amount': 8.50,
-            'tip': 2.00,
-            'orderId': '8832',
-            'cancelled': false,
-          }),
-          _orderCard({
-            'restaurant': 'Starbucks - Uptown',
-            'time': '09:15 AM',
-            'distance': '1.1',
-            'amount': 5.20,
-            'tip': 1.50,
-            'orderId': '8831',
-            'cancelled': false,
-          }),
-          _orderCard({
-            'restaurant': 'Taco Bell - Westside',
-            'time': '08:30 AM',
-            'distance': '3.5',
-            'amount': 0.00,
-            'tip': 0.0,
-            'orderId': 'Customer request',
-            'cancelled': true,
-          }),
+          Column(
+            children: const [
+              Icon(Icons.receipt_long_outlined, size: 40, color: _C.muted),
+              SizedBox(height: 12),
+              Text('No orders in this period',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700, color: _C.navy)),
+              SizedBox(height: 4),
+              Text('Delivered and cancelled orders will show up here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: _C.muted)),
+            ],
+          ),
         ],
       );
 
@@ -226,42 +417,54 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     final cancelled = o['cancelled'] == true;
     final tip       = (o['tip'] ?? 0.0) as double;
     final amount    = (o['amount'] ?? 0.0) as double;
-    final status    = cancelled ? 'Cancelled' : 'Completed';
-    final statusColor = cancelled
-        ? const Color(0xFFf43f5e)
-        : const Color(0xFF10b981);
+    final itemCount = (o['itemCount'] ?? 0) as int;
+    final status    = cancelled ? 'Cancelled' : 'Delivered';
+    final statusColor = cancelled ? _C.error : _C.success;
+    final statusBg     = cancelled ? const Color(0xFFFEE2E2) : _C.successBg;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0b1a3d),
+        color: _C.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: _C.softBlueBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.shopping_bag_outlined, color: _C.primary, size: 22),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(o['restaurant'] ?? '',
                         style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            decoration: cancelled
-                                ? TextDecoration.lineThrough
-                                : null,
-                            decorationColor: Colors.white54)),
-                    const SizedBox(height: 3),
-                    Text(
-                        '${o['time'] ?? '—'} • ${o['distance'] ?? '—'} mi',
-                        style: const TextStyle(
-                            color: Colors.white54, fontSize: 13)),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: _C.navy,
+                            decoration: cancelled ? TextDecoration.lineThrough : null,
+                            decorationColor: _C.muted)),
+                    const SizedBox(height: 2),
+                    Text('${o['time'] ?? '—'}  •  Order #${o['orderId']}',
+                        style: const TextStyle(color: _C.body, fontSize: 12)),
                   ],
                 ),
               ),
@@ -269,64 +472,74 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    cancelled ? '\$0.00' : '+\$${amount.toStringAsFixed(2)}',
+                    cancelled ? '£0.00' : '£${(amount + tip).toStringAsFixed(2)}',
                     style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: cancelled
-                            ? Colors.white54
-                            : const Color(0xFF10b981)),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: cancelled ? _C.muted : _C.navy),
                   ),
-                  if (tip > 0)
-                    Text('incl. \$${tip.toStringAsFixed(2)} tip',
-                        style: const TextStyle(
-                            color: Colors.white38, fontSize: 12)),
+                  const SizedBox(height: 3),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusBg,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(status,
+                        style: TextStyle(
+                            color: statusColor, fontWeight: FontWeight.w700, fontSize: 11)),
+                  ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Divider(color: Colors.white10, height: 1),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      cancelled
-                          ? Icons.cancel_outlined
-                          : Icons.check_circle_outline,
-                      color: statusColor,
-                      size: 16,
+          if (!cancelled) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF1F5F9)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.shopping_bag_outlined, size: 15, color: _C.body),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      itemCount > 0 ? '$itemCount item${itemCount == 1 ? '' : 's'}' : 'Order details',
+                      style: const TextStyle(fontSize: 12.5, color: _C.body),
                     ),
-                    const SizedBox(width: 6),
-                    Text(status,
+                  ),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: _C.muted),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(tip > 0 ? 'Includes £${tip.toStringAsFixed(2)} tip' : 'Delivery fee',
+                    style: const TextStyle(fontSize: 12, color: _C.body)),
+                GestureDetector(
+                  onTap: () => _showBreakdown(o),
+                  child: Row(children: const [
+                    Icon(Icons.receipt_long_rounded, size: 14, color: _C.primary),
+                    SizedBox(width: 4),
+                    Text('View breakdown',
                         style: TextStyle(
-                            color: statusColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13)),
-                  ],
+                            fontSize: 12.5, fontWeight: FontWeight.w700, color: _C.primary)),
+                  ]),
                 ),
-              ),
-              Text(
-                cancelled
-                    ? (o['cancelReason']?.toString().isNotEmpty == true
-                        ? o['cancelReason']
-                        : 'Customer request')
-                    : 'Order #${o['orderId']}',
-                style: const TextStyle(
-                    color: Colors.white38, fontSize: 12),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ] else if ((o['cancelReason'] ?? '').toString().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(o['cancelReason'],
+                style: const TextStyle(color: _C.muted, fontSize: 12)),
+          ],
         ],
       ),
     );

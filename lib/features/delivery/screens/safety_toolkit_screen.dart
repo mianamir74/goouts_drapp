@@ -3,19 +3,49 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// ⚠ FLAGGED 6 September 2026, NOT FULLY BUILT — same "flag, don't fake"
-// treatment as host_14's pricing alert. Fixed here: the SOS dialog (was
-// claiming to auto-contact 999 and share location; did neither — now a real
-// tel:999 dialer open, honestly labelled) and Current Location (was a
-// hardcoded fake street address; now the device's real GPS coordinates).
+// ─────────────────────────────────────────────────────────────────────────────
+//  Rebuilt 7 September 2026 to the light theme design system in
+//  design/STITCH_6_DRAPP.md, using 11_safety_toolkit_screen as a loose
+//  visual reference — not a literal port.
 //
-// NOT fixed, and deliberately not faked: "Tracking Active" (no live-tracking
-// backend exists outside an active delivery), "Voice Monitoring Active" (no
-// audio pipeline, and building one is a consent/privacy/retention decision,
-// not a UI fix), "Share My Trip", "Report a Safety Issue", "Record Audio",
-// and the three Safety Resources links — none has a screen, collection, or
-// backend behind it. All still show but do nothing on tap; none previously
-// had a tap handler at all (not even a no-op) so nothing here regressed.
+//  Real, kept from the 6 September 2026 fix: the 999 confirmation dialog
+//  (honestly states GoOuts does not auto-contact emergency services or
+//  share location — it just opens the dialer) and Current Location (the
+//  device's real GPS coordinates via Geolocator, not a hardcoded address).
+//  Added this pass: the real GPS accuracy reading (`Position.accuracy`,
+//  in metres) replacing the Stitch reference's fabricated "±4m" figure.
+//
+//  Dropped this pass, previously present but false: a permanent floating
+//  "Voice Monitoring Active" pill and a "Tracking Active" badge on a fake
+//  map — both asserted live monitoring that doesn't exist (no audio
+//  pipeline, no live-location broadcast outside an active delivery). The
+//  Stitch reference's own "Coming soon" framing for its three prototype
+//  features (Share Trip, Report Incident, Record Audio) is the honest
+//  version of the same idea and is what's used here instead. Also dropped:
+//  the Stitch reference's resolved street address (no reverse-geocoding is
+//  wired up), its fabricated "v2.1 • UK Road Standards" compliance-sounding
+//  version footer, and its mislabelled app-bar title ("Phone Verification"
+//  — an apparent copy-paste error in the reference file).
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg        = Color(0xFFF2F4F7);
+  static const surface   = Color(0xFFFFFFFF);
+  static const primary   = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy      = Color(0xFF0D1B3E);
+  static const body      = Color(0xFF475569);
+  static const muted     = Color(0xFF94A3B8);
+  static const paleTint  = Color(0xFFE0F3FB);
+  static const gpsBox    = Color(0xFFF0F6FF);
+  static const copyBg    = Color(0xFFDBEAFE);
+  static const emergency = Color(0xFFB91C1C);
+  static const alertBg   = Color(0xFFFEE2E2);
+  static const advisoryBg = Color(0xFFEFF6FF);
+  static const advisoryBorder = Color(0xFFBFDBFE);
+  static const comingSoonBg = Color(0xFFE0F2FE);
+  static const comingSoonText = Color(0xFF0369A1);
+}
+
 class SafetyToolkitScreen extends StatefulWidget {
   const SafetyToolkitScreen({super.key});
 
@@ -24,11 +54,8 @@ class SafetyToolkitScreen extends StatefulWidget {
 }
 
 class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
-  bool _voiceActive = true;
-
-  // Real device coordinates, replacing a hardcoded fake address. Falls back
-  // to an honest "not available" rather than another made-up value.
   String _coords = 'Fetching your location…';
+  String? _accuracy;
 
   @override
   void initState() {
@@ -49,34 +76,47 @@ class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
       }
       final pos = await Geolocator.getCurrentPosition();
       if (!mounted) return;
-      setState(() =>
-          _coords = '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}');
+      setState(() {
+        _coords =
+            '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+        _accuracy = '±${pos.accuracy.toStringAsFixed(0)}m accuracy';
+      });
     } catch (_) {
       if (mounted) setState(() => _coords = 'Location not available');
     }
+  }
+
+  void _copyCoordinates() {
+    Clipboard.setData(ClipboardData(text: _coords));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Location copied')),
+    );
+  }
+
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature — coming soon')),
+    );
   }
 
   void _triggerSos() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0b1a3d),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20)),
-        title: const Text('🚨 Emergency SOS',
-            style: TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: _C.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Emergency Services (999)',
+            style: TextStyle(color: _C.navy, fontWeight: FontWeight.bold)),
         content: const Text(
           'Tapping Call 999 opens your phone dialer with 999 ready to '
           'call. GoOuts does not automatically contact emergency services '
           'or share your location — you place the call yourself.',
-          style: TextStyle(color: Colors.white70, height: 1.5),
+          style: TextStyle(color: _C.body, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: _C.muted)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -84,13 +124,11 @@ class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
               await launchUrl(Uri(scheme: 'tel', path: '999'));
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFef4444),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              backgroundColor: _C.emergency,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Call 999',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -100,362 +138,308 @@ class _SafetyToolkitScreenState extends State<SafetyToolkitScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+      backgroundColor: _C.bg,
+      appBar: AppBar(
+        backgroundColor: _C.surface,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: _C.navy),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Safety Toolkit',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _C.navy)),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              // ── GPS card ──────────────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: _C.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('CURRENT LOCATION',
+                            style: TextStyle(
+                                fontSize: 11.5, fontWeight: FontWeight.w800, color: _C.muted, letterSpacing: 0.6)),
+                        if (_accuracy != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: _C.paleTint,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(_accuracy!,
+                                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: _C.primaryDk)),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _C.gpsBox,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(_coords,
+                                style: const TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.w900, color: _C.navy, height: 1.2)),
+                          ),
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.my_location_rounded, color: _C.primaryDk, size: 22),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Share exact coordinates with emergency services or dispatch if needed in low-signal areas.',
+                      style: TextStyle(fontSize: 12, color: _C.body, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        onPressed: _coords.contains(',') ? _copyCoordinates : null,
+                        icon: const Icon(Icons.copy_rounded, size: 16, color: _C.primaryDk),
+                        label: const Text('Copy GPS coordinates',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _C.primaryDk)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _C.copyBg,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Emergency card ───────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: _C.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(color: _C.alertBg, borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.emergency_rounded, color: _C.emergency, size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Emergency Services (999)',
+                              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: _C.navy)),
+                        ]),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: _C.emergency, borderRadius: BorderRadius.circular(10)),
+                          child: const Text('URGENT',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: _C.advisoryBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _C.advisoryBorder),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Icon(Icons.info_outline_rounded, color: _C.emergency, size: 18),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Tapping opens your phone dialer pre-filled with 999. GoOuts does not automatically place the call, monitor this button, or track your live location.',
+                              style: TextStyle(fontSize: 12, color: _C.body, height: 1.35),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: _triggerSos,
+                        icon: const Icon(Icons.call_rounded, color: Colors.white, size: 20),
+                        label: const Text('Open Phone Dialer (999)',
+                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _C.emergency,
+                          elevation: 2,
+                          shadowColor: _C.emergency.withOpacity(0.35),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── Safety in development ────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text('Safety In Development',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _C.navy)),
+                  Text('Prototypes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _C.muted)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _prototypeCard(
+                icon: Icons.radar_rounded,
+                title: 'Share Live Trip',
+                description: 'Share a live tracking link with trusted contacts while active on delivery shifts.',
+              ),
+              const SizedBox(height: 12),
+              _prototypeCard(
+                icon: Icons.error_outline_rounded,
+                title: 'Report Safety Incident',
+                description: 'Dedicated reporting for road hazards, aggressive behaviour, or vehicle accidents. Currently handled via Live Chat.',
+              ),
+              const SizedBox(height: 12),
+              _prototypeCard(
+                icon: Icons.mic_none_rounded,
+                title: 'Safety Audio Recording',
+                description: 'Encrypted on-device audio recording for peace of mind during pickups and handoffs.',
+              ),
+
+              const SizedBox(height: 18),
+
+              // ── Advisory box ──────────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _C.advisoryBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _C.advisoryBorder.withOpacity(0.6)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Icon(Icons.verified_user_outlined, color: _C.primaryDk, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'In an emergency involving personal safety or injury, call 999 immediately before contacting GoOuts Support.',
+                        style: TextStyle(fontSize: 12, color: _C.navy, height: 1.35, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _prototypeCard({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return InkWell(
+      onTap: () => _showComingSoon(title),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(color: _C.comingSoonBg, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: _C.primaryDk, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header ──────────────────────────────────────────
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Safety Toolkit',
-                                style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white)),
-                            SizedBox(height: 4),
-                            Text('Help is always available',
-                                style: TextStyle(
-                                    color: Colors.white54, fontSize: 14)),
-                          ],
-                        ),
-                      ),
+                      Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: _C.navy)),
                       Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFef4444).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: const Color(0xFFef4444)
-                                  .withOpacity(0.3)),
-                        ),
-                        child: const Icon(Icons.shield_outlined,
-                            color: Color(0xFFef4444)),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(color: _C.comingSoonBg, borderRadius: BorderRadius.circular(12)),
+                        child: Text('Coming soon',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _C.comingSoonText)),
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 20),
-
-                  // ── Location card ────────────────────────────────────
-                  _safetyTile(
-                    icon: Icons.location_on_outlined,
-                    title: 'Current Location',
-                    subtitle: _coords,
-                    trailing: TextButton(
-                      onPressed: _coords.contains(',')
-                          ? () {
-                              Clipboard.setData(ClipboardData(text: _coords));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Location copied')),
-                              );
-                            }
-                          : null,
-                      child: const Text('Copy',
-                          style: TextStyle(color: Color(0xFF0392ca))),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // ── SOS ──────────────────────────────────────────────
-                  GestureDetector(
-                    onTap: _triggerSos,
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFef4444),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFef4444).withOpacity(0.4),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.emergency_share,
-                              color: Colors.white, size: 28),
-                          SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Emergency Assistance',
-                                    style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white)),
-                                SizedBox(height: 4),
-                                Text(
-                                    'Call 999 • Say "Hey GoOuts, Emergency"',
-                                    style: TextStyle(
-                                        // Colors.white80 does not exist —
-                                        // the Material palette goes
-                                        // white70 -> white60 -> white54...
-                                        color: Colors.white70,
-                                        fontSize: 13)),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right,
-                              color: Colors.white54),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  _safetyTile(
-                    icon: Icons.ios_share,
-                    title: 'Share My Trip',
-                    subtitle: 'Send live location to a contact',
-                    showChevron: true,
-                  ),
-                  const SizedBox(height: 14),
-                  _safetyTile(
-                    icon: Icons.report_problem_outlined,
-                    title: 'Report a Safety Issue',
-                    subtitle: 'Non-emergency report to GoOuts',
-                    showChevron: true,
-                  ),
-                  const SizedBox(height: 14),
-                  _safetyTile(
-                    icon: Icons.mic_none_outlined,
-                    title: 'Record Audio',
-                    subtitle: 'Encrypted recording for safety',
-                    showChevron: true,
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // ── Mini map ─────────────────────────────────────────
-                  Container(
-                    height: 140,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: const Color(0xFF0b1a3d),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Stack(
-                        children: [
-                          CustomPaint(
-                            painter: _SafetyMapPainter(),
-                            size: Size.infinite,
-                          ),
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF031134)
-                                    .withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF0392ca),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text('Tracking Active',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // ── Resources ────────────────────────────────────────
-                  const Text('Safety Resources',
-                      style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5)),
-                  const SizedBox(height: 14),
-                  _resourceLink('Community Guidelines'),
-                  const Divider(color: Colors.white10),
-                  _resourceLink('Insurance Coverage Info'),
-                  const Divider(color: Colors.white10),
-                  _resourceLink('How We Protect You'),
-
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 4),
+                  Text(description, style: const TextStyle(fontSize: 12, color: _C.body, height: 1.35)),
                 ],
               ),
             ),
-          ),
-
-          // ── Floating voice indicator ─────────────────────────────────
-          if (_voiceActive)
-            Positioned(
-              bottom: 24,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    vertical: 12, horizontal: 20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0b1a3d).withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                      color:
-                          const Color(0xFF0392ca).withOpacity(0.5)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0392ca).withOpacity(0.15),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.mic,
-                        color: Color(0xFF0392ca), size: 18),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Voice Monitoring Active',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () =>
-                          setState(() => _voiceActive = !_voiceActive),
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF10b981),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
-
-  Widget _safetyTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    Widget? trailing,
-    bool showChevron = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0b1a3d),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF0392ca), size: 24),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
-                const SizedBox(height: 3),
-                Text(subtitle,
-                    style: const TextStyle(
-                        color: Colors.white38, fontSize: 12)),
-              ],
-            ),
-          ),
-          if (trailing != null) trailing,
-          if (showChevron)
-            const Icon(Icons.chevron_right, color: Colors.white24),
-        ],
-      ),
-    );
-  }
-
-  Widget _resourceLink(String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white, fontSize: 15)),
-          const Icon(Icons.open_in_new, color: Colors.white24, size: 18),
-        ],
-      ),
-    );
-  }
-}
-
-class _SafetyMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.04)
-      ..strokeWidth = 1;
-    for (double x = 0; x < size.width; x += 24) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-    for (double y = 0; y < size.height; y += 24) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-    // Location dot
-    final dot = Paint()..color = const Color(0xFF0392ca);
-    canvas.drawCircle(
-        Offset(size.width / 2, size.height / 2), 6, dot);
-    // Pulse rings
-    final ring = Paint()
-      ..color = const Color(0xFF0392ca).withOpacity(0.15)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawCircle(
-        Offset(size.width / 2, size.height / 2), 20, ring);
-    canvas.drawCircle(
-        Offset(size.width / 2, size.height / 2), 35, ring);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
 }

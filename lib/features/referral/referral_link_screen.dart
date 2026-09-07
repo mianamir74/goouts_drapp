@@ -148,9 +148,18 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
     return 'GB' + normalized;
   }
 
+  // ⚠ FIXED 7 September 2026. `collection` used to be re-derived here from
+  // isBusiness alone, businesses or drivers, nothing else — so a food driver
+  // whose code this generated got it written to a 'drivers' document that
+  // does not exist for them, while _buildDriverStream a few lines away was
+  // reading from wherever the caller actually resolved (now food_drivers).
+  // Two places computing the same collection name independently is exactly
+  // how that kind of drift happens; this now takes the already-resolved
+  // collection as a required argument instead of guessing again.
   Future<void> _ensureOwnReferralCode({
     required String uid,
     required String existingCode,
+    required String collection,
     required bool isBusiness,
   }) async {
     if (_isEnsuringReferralCode) return;
@@ -167,7 +176,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
 
       final DocumentReference<Map<String, dynamic>> docRef = FirebaseFirestore
           .instance
-          .collection(isBusiness ? 'businesses' : 'drivers')
+          .collection(collection)
           .doc(uid);
 
       await docRef.set(
@@ -461,6 +470,13 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
     );
   }
 
+  // ⚠ FIXED 7 September 2026. ownerCollection used to be re-derived here
+  // from isBusiness/isCabDriver, same bug shape as _ensureOwnReferralCode
+  // above — a food driver's invite got saved under 'drivers', a document
+  // they do not have, instead of their real food_drivers profile. Takes the
+  // already-resolved collection directly now. ownerAccountType is derived
+  // from that same collection so the label on the saved invite always
+  // matches where it was actually written.
   Future<void> _saveInviteRecord({
     required String inviterUid,
     required String inviterReferralCode,
@@ -470,12 +486,17 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
     required String inviteePhoneRaw,
     required String inviteePhoneNormalized,
     required String inviteLink,
+    required String ownerCollection,
     required bool isBusiness,
     bool isCabDriver = false,
   }) async {
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
-    final String ownerCollection = isBusiness ? 'businesses' : isCabDriver ? 'cab_drivers' : 'drivers';
-    final String ownerAccountType = isBusiness ? 'business' : isCabDriver ? 'cab_driver' : 'driver';
+    final String ownerAccountType = switch (ownerCollection) {
+      'businesses' => 'business',
+      'cab_drivers' => 'cab_driver',
+      'food_drivers' => 'food_driver',
+      _ => 'driver',
+    };
 
     final Map<String, dynamic> inviteData = <String, dynamic>{
       'inviteId': inviteId,
@@ -555,6 +576,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
   Future<void> _showInviteDriverSheet({
     required String inviterUid,
     required String referralCode,
+    required String ownerCollection,
     required bool isBusiness,
     bool isCabDriver = false,
   }) async {
@@ -606,8 +628,6 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
                 isSubmitting = true;
               });
 
-              final String ownerCollection = isBusiness ? 'businesses' : isCabDriver ? 'cab_drivers' : 'drivers';
-
               final String inviteId = FirebaseFirestore.instance
                   .collection(ownerCollection)
                   .doc(inviterUid)
@@ -640,6 +660,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
                   inviteePhoneRaw: inviteePhoneRaw,
                   inviteePhoneNormalized: inviteePhoneNormalized,
                   inviteLink: inviteLink,
+                  ownerCollection: ownerCollection,
                   isBusiness: isBusiness,
                   isCabDriver: isCabDriver,
                 );
@@ -993,6 +1014,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
   Widget _buildReferralContent({
     required User currentUser,
     required String referralCode,
+    required String ownerCollection,
     required bool isBusiness,
     bool isCabDriver = false,
   }) {
@@ -1119,6 +1141,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
                     onPressed: () => _showInviteDriverSheet(
                       inviterUid: currentUser.uid,
                       referralCode: referralCode,
+                      ownerCollection: ownerCollection,
                       isBusiness: isBusiness,
                       isCabDriver: isCabDriver,
                     ),
@@ -1148,8 +1171,17 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
     );
   }
 
-  Widget _buildDriverStream(User currentUser, {bool isCabDriver = false}) {
-    final String driverCollection = isCabDriver ? 'cab_drivers' : 'drivers';
+  // ⚠ FIXED 7 September 2026. driverCollection used to be derived from a
+  // single isCabDriver bool, cab_drivers or drivers, nothing else. Every
+  // goouts_drapp food delivery driver actually lives in food_drivers, so
+  // this screen was reading and writing a 'drivers' document that did not
+  // exist for them — referral code generation, invite saving and the
+  // referral count on the earnings screen all silently pointed at the wrong
+  // record. isCabDriver still controls invite message copy only (Rider
+  // Driver wording vs the default Food Delivery wording, which is already
+  // correct for food_drivers), it no longer decides the collection name.
+  Widget _buildDriverStream(User currentUser, {required String driverCollection}) {
+    final bool isCabDriver = driverCollection == 'cab_drivers';
     final DocumentReference<Map<String, dynamic>> currentDriverRef =
         FirebaseFirestore.instance.collection(driverCollection).doc(currentUser.uid);
 
@@ -1190,6 +1222,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
           _ensureOwnReferralCode(
             uid: currentUser.uid,
             existingCode: referralCode,
+            collection: driverCollection,
             isBusiness: false,
           );
 
@@ -1201,6 +1234,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
         return _buildReferralContent(
           currentUser: currentUser,
           referralCode: referralCode,
+          ownerCollection: driverCollection,
           isBusiness: false,
           isCabDriver: isCabDriver,
         );
@@ -1253,6 +1287,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
               _ensureOwnReferralCode(
                 uid: currentUser.uid,
                 existingCode: referralCode,
+                collection: 'businesses',
                 isBusiness: true,
               );
 
@@ -1264,22 +1299,36 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
             return _buildReferralContent(
               currentUser: currentUser,
               referralCode: referralCode,
+              ownerCollection: 'businesses',
               isBusiness: true,
             );
           }
 
-          // Check cab_drivers before falling back to drivers
-          return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            future: FirebaseFirestore.instance
-                .collection('cab_drivers')
-                .doc(currentUser.uid)
-                .get(),
-            builder: (context, cabSnapshot) {
-              if (cabSnapshot.connectionState == ConnectionState.waiting) {
+          // ⚠ FIXED 7 September 2026. Only ever checked cab_drivers before
+          // falling back to 'drivers' — food_drivers, the real collection
+          // every goouts_drapp food delivery driver lives in, was never
+          // checked at all, so this always fell through to a 'drivers'
+          // document that does not exist for them. Checks both now and
+          // prefers food_drivers, since that is this app's primary account
+          // type; cab_drivers stays supported for the rider-driver side of
+          // the same app.
+          return FutureBuilder<List<DocumentSnapshot<Map<String, dynamic>>>>(
+            future: Future.wait([
+              FirebaseFirestore.instance.collection('cab_drivers').doc(currentUser.uid).get(),
+              FirebaseFirestore.instance.collection('food_drivers').doc(currentUser.uid).get(),
+            ]),
+            builder: (context, driverTypeSnapshot) {
+              if (driverTypeSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-              final bool isCabDriver = cabSnapshot.data?.exists ?? false;
-              return _buildDriverStream(currentUser, isCabDriver: isCabDriver);
+              final bool isCabDriver = driverTypeSnapshot.data?[0].exists ?? false;
+              final bool isFoodDriver = driverTypeSnapshot.data?[1].exists ?? false;
+              final String driverCollection = isCabDriver
+                  ? 'cab_drivers'
+                  : isFoodDriver
+                      ? 'food_drivers'
+                      : 'drivers';
+              return _buildDriverStream(currentUser, driverCollection: driverCollection);
             },
           );
         },

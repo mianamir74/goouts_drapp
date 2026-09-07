@@ -9,6 +9,60 @@ import 'package:image_picker/image_picker.dart';
 import 'main_delivery_scaffold.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reskinned 7 September 2026 to the light theme design system in
+//  design/STITCH_6_DRAPP.md, using 04_registration_screen as the visual
+//  reference, card-by-card, on this app's existing single-page form (not
+//  the mockup's separate Personal/Vehicle/Identity/Review pages — this form
+//  has always submitted everything in one go, and turning that into a real
+//  multi-step wizard is a bigger change than a visual reskin; the section
+//  headers below label the same groupings without claiming they're
+//  separate, un-submitted steps).
+//
+//  ⚠ REMOVED 7 September 2026 — the bank details section (Account Holder
+//  Name, Routing Number, Account Number). It captured raw banking details
+//  into plain TextEditingControllers, under a banner claiming "Secure
+//  payments with Stripe" — but there was no Stripe integration anywhere in
+//  this file, and _submit() never even saved the routing/account numbers
+//  to Firestore. The fields went nowhere while promising bank-grade
+//  security. Collecting real banking details needs a real Stripe Connect
+//  (or equivalent) onboarding flow — that is a payout-system build, which
+//  per this project's standing rule does not happen without being asked
+//  for directly. Replaced with an honest "not collected yet" notice.
+//
+//  ⚠ CHANGED 7 September 2026 — the Phone Number field used to be an
+//  editable text field that _submit() silently ignored (it saved
+//  `_auth.currentUser?.phoneNumber` instead, the number already verified by
+//  OTP). Editing it did nothing. Replaced with a read-only display of the
+//  actually-verified number.
+//
+//  ⚠ CHANGED 7 September 2026 — the licence photo picker now opens the
+//  camera directly (ImageSource.camera) instead of the gallery, matching
+//  the "camera capture only, no gallery imports" anti-fraud note this
+//  design carries — a real behavioural change, not just new copy.
+//
+//  ⚠ SOFTENED 7 September 2026 — the mockup's "£50 completion incentive
+//  applied" is a specific, unconfirmed bonus figure (see
+//  design/DRIVER_PAY_ALGORITHM_SPEC.md — no signup bonus has been decided).
+//  Replaced with a description of what the referral system actually does
+//  today: it credits the referrer's residual income once this driver is
+//  approved.
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg       = Color(0xFFF2F4F7);
+  static const surface  = Color(0xFFFFFFFF);
+  static const primary  = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy     = Color(0xFF0D1B3E);
+  static const accent   = Color(0xFFF97316);
+  static const paleTint = Color(0xFFE0F3FB);
+  static const softBlueBg = Color(0xFFEFF5FD);
+  static const body     = Color(0xFF475569);
+  static const muted    = Color(0xFF94A3B8);
+  static const success  = Color(0xFF16A34A);
+  static const border   = Color(0xFFE2E8F0);
+}
+
 class DappRegistrationScreen extends StatefulWidget {
   const DappRegistrationScreen({super.key});
 
@@ -20,10 +74,6 @@ class DappRegistrationScreen extends StatefulWidget {
 class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
   final _nameCtrl      = TextEditingController();
   final _emailCtrl     = TextEditingController();
-  final _phoneCtrl     = TextEditingController();
-  final _accountHolder = TextEditingController();
-  final _routingCtrl   = TextEditingController();
-  final _accountCtrl   = TextEditingController();
   final _referralCtrl  = TextEditingController();
 
   int  _vehicleIdx = 0; // 0=Bicycle, 1=Scooter, 2=Car
@@ -38,10 +88,9 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
 
   @override
   void dispose() {
-    for (final c in [
-      _nameCtrl, _emailCtrl, _phoneCtrl,
-      _accountHolder, _routingCtrl, _accountCtrl, _referralCtrl
-    ]) c.dispose();
+    for (final c in [_nameCtrl, _emailCtrl, _referralCtrl]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -51,7 +100,9 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
   }
 
   Future<void> _pickLicense() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
+    // Camera only — matches the anti-fraud note below, and this app has no
+    // gallery-swap fraud check, so it should not offer a gallery path here.
+    final picked = await _picker.pickImage(source: ImageSource.camera);
     if (picked != null) setState(() => _licenseFile = File(picked.path));
   }
 
@@ -87,7 +138,6 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
         'profilePhotoUrl': photoUrl,
         'licenseUrl':      licenseUrl,
         'referralCode':    _referralCtrl.text.trim(),
-        'bankAccountHolder': _accountHolder.text.trim(),
         'isOnline':        false,
         'status':          'pending_approval',
         'rating':          5.0,
@@ -119,310 +169,360 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final verifiedPhone = _auth.currentUser?.phoneNumber ?? 'Not verified';
+
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
+      backgroundColor: _C.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF031134),
+        backgroundColor: _C.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_rounded, color: _C.navy),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Registration',
+        title: const Text('Driver Registration',
             style: TextStyle(
-                color: Color(0xFF0392ca),
-                fontWeight: FontWeight.bold,
-                fontSize: 20)),
+                fontSize: 18, fontWeight: FontWeight.w700, color: _C.navy)),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
 
-            // ── Step indicator ────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Step 1 of 4',
-                    style: TextStyle(
-                        color: Color(0xFF0392ca),
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold)),
-                const Text('Personal Info',
-                    style: TextStyle(
-                        color: Colors.white54, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: List.generate(4, (i) {
-                return Expanded(
-                  child: Container(
-                    margin: EdgeInsets.only(right: i < 3 ? 8 : 0),
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: i == 0
-                          ? const Color(0xFF0392ca)
-                          : Colors.white10,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                );
-              }),
-            ),
-
-            const SizedBox(height: 28),
-
-            // ── Profile photo ─────────────────────────────────────
-            Center(
-              child: GestureDetector(
-                onTap: _pickPhoto,
+              // ── Personal details card ────────────────────────────────
+              _card(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 48,
-                      backgroundColor: const Color(0xFF0b1a3d),
-                      backgroundImage: _profilePhoto != null
-                          ? FileImage(_profilePhoto!)
-                          : null,
-                      child: _profilePhoto == null
-                          ? const Icon(Icons.add_a_photo_outlined,
-                              size: 34, color: Colors.white54)
-                          : null,
+                    Row(children: const [
+                      Icon(Icons.badge_outlined, size: 20, color: _C.primary),
+                      SizedBox(width: 8),
+                      Text('Personal details',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: _C.navy)),
+                    ]),
+                    const SizedBox(height: 16),
+
+                    // Profile photo
+                    Center(
+                      child: GestureDetector(
+                        onTap: _pickPhoto,
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 44,
+                              backgroundColor: _C.paleTint,
+                              backgroundImage: _profilePhoto != null
+                                  ? FileImage(_profilePhoto!)
+                                  : null,
+                              child: _profilePhoto == null
+                                  ? const Icon(Icons.add_a_photo_outlined,
+                                      size: 30, color: _C.primary)
+                                  : null,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('Upload profile photo',
+                                style: TextStyle(color: _C.muted, fontSize: 12)),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text('Upload Profile Photo',
+                    const SizedBox(height: 18),
+
+                    _field('Full Name', 'John Doe', _nameCtrl),
+                    const SizedBox(height: 16),
+                    _field('Email Address', 'john@example.com', _emailCtrl,
+                        type: TextInputType.emailAddress),
+                    const SizedBox(height: 16),
+
+                    const Text('Mobile number',
                         style: TextStyle(
-                            color: Colors.white54, fontSize: 12)),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: _C.body)),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _C.softBlueBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _C.primary.withOpacity(0.2)),
+                      ),
+                      child: Row(children: [
+                        const Icon(Icons.verified_rounded, size: 16, color: _C.success),
+                        const SizedBox(width: 8),
+                        Text(verifiedPhone,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: _C.navy)),
+                        const Spacer(),
+                        const Text('Verified',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: _C.success)),
+                      ]),
+                    ),
                   ],
                 ),
               ),
-            ),
 
-            const SizedBox(height: 28),
+              const SizedBox(height: 16),
 
-            // ── Form fields ───────────────────────────────────────
-            _field('Full Name', 'John Doe', _nameCtrl),
-            const SizedBox(height: 18),
-            _field('Email Address', 'john@example.com', _emailCtrl,
-                type: TextInputType.emailAddress),
-            const SizedBox(height: 18),
-            _field('Phone Number', '+1 (555) 000-0000', _phoneCtrl,
-                type: TextInputType.phone),
-
-            const SizedBox(height: 28),
-
-            // ── Vehicle type ──────────────────────────────────────
-            const Text('Vehicle Type',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: Colors.white)),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                _vehicle(Icons.directions_bike, 'Bicycle', 0),
-                const SizedBox(width: 10),
-                _vehicle(Icons.moped, 'Scooter', 1),
-                const SizedBox(width: 10),
-                _vehicle(Icons.directions_car, 'Car', 2),
-              ],
-            ),
-
-            const SizedBox(height: 28),
-
-            // ── License upload ────────────────────────────────────
-            const Text("Driver's License (Front)",
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: Colors.white)),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: _pickLicense,
-              child: Container(
-                width: double.infinity,
-                height: 130,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0b1a3d),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white24,
-                    style: BorderStyle.solid,
-                  ),
-                ),
-                child: _licenseFile != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.file(_licenseFile!,
-                            fit: BoxFit.cover),
-                      )
-                    : const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.file_upload_outlined,
-                              size: 32, color: Color(0xFF0392ca)),
-                          SizedBox(height: 10),
-                          Text('Tap to upload image',
-                              style: TextStyle(
-                                  color: Colors.white38, fontSize: 12)),
-                        ],
-                      ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── Stripe banner ─────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0392ca).withOpacity(0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: const Color(0xFF0392ca).withOpacity(0.2)),
-              ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.lock_outline,
-                      size: 20, color: Color(0xFF0392ca)),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Secure payments with Stripe',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: Colors.white)),
-                        SizedBox(height: 4),
-                        Text(
-                          'Your bank details are securely processed by Stripe. We do not store your banking information directly.',
+              // ── Vehicle selector card ────────────────────────────────
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: const [
+                      Icon(Icons.directions_car_outlined, size: 20, color: _C.primary),
+                      SizedBox(width: 8),
+                      Text('Registered vehicle',
                           style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                              height: 1.4),
-                        ),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: _C.navy)),
+                    ]),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _vehicle(Icons.directions_bike_rounded, 'Bicycle', 0),
+                        const SizedBox(width: 10),
+                        _vehicle(Icons.electric_moped_rounded, 'E-Scooter /\nMoped', 1),
+                        const SizedBox(width: 10),
+                        _vehicle(Icons.directions_car_rounded, 'Car', 2),
                       ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-            // ── Bank details ──────────────────────────────────────
-            _field('Account Holder Name', 'John Doe', _accountHolder),
-            const SizedBox(height: 18),
-            _field('Routing Number', '000000000', _routingCtrl,
-                type: TextInputType.number),
-            const SizedBox(height: 18),
-            _field('Account Number', '••••••••••••', _accountCtrl,
-                obscure: true, type: TextInputType.number),
-
-            const SizedBox(height: 40),
-
-            // ── Referral code ─────────────────────────────────────
-            Center(
-              child: Column(
-                children: [
-                  const Icon(Icons.card_giftcard,
-                      size: 52, color: Color(0xFF10b981)),
-                  const SizedBox(height: 14),
-                  const Text('Got a Referral Code?',
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Enter it below to claim your sign-up bonus after your first 10 deliveries.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 14,
-                        height: 1.5),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0b1a3d),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: TextField(
-                      controller: _referralCtrl,
-                      textAlign: TextAlign.center,
-                      textCapitalization: TextCapitalization.characters,
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 4,
-                          color: Colors.white),
-                      decoration: const InputDecoration(
-                        hintText: 'CODE123',
-                        hintStyle: TextStyle(
-                            color: Colors.white24,
-                            letterSpacing: 4,
-                            fontSize: 22),
-                        border: InputBorder.none,
+              // ── Identity & compliance card ───────────────────────────
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: const [
+                      Icon(Icons.verified_user_outlined, size: 20, color: _C.accent),
+                      SizedBox(width: 8),
+                      Text('Identity & compliance',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: _C.navy)),
+                    ]),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F6FD),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Icon(Icons.shield_outlined, size: 18, color: _C.primary),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Camera capture only — gallery imports are disabled for fraud prevention.',
+                              style: TextStyle(fontSize: 11.5, color: _C.body, height: 1.35),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextButton(
-                    onPressed: () => _referralCtrl.clear(),
-                    child: const Text('Skip for now',
-                        style: TextStyle(
-                            color: Colors.white54,
-                            decoration: TextDecoration.underline,
-                            decorationColor: Colors.white54)),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // ── Continue button ───────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0392ca),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  elevation: 0,
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: _pickLicense,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _licenseFile != null ? _C.success : _C.border,
+                          ),
+                        ),
+                        child: _licenseFile != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.file(_licenseFile!,
+                                    height: 100, fit: BoxFit.cover),
+                              )
+                            : Column(
+                                children: const [
+                                  Icon(Icons.camera_alt_outlined,
+                                      size: 26, color: _C.primary),
+                                  SizedBox(height: 8),
+                                  Text('Take photo of driving licence (front)',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: _C.primary)),
+                                  SizedBox(height: 2),
+                                  Text('Tap to open camera',
+                                      style: TextStyle(fontSize: 11, color: _C.muted)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
-                child: _loading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.5, color: Colors.white))
-                    : const Text('Continue',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18)),
               ),
-            ),
 
-            const SizedBox(height: 40),
-          ],
+              const SizedBox(height: 16),
+
+              // ── Payout details — honestly not collected yet ──────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _C.paleTint,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Icon(Icons.info_outline_rounded, size: 16, color: _C.primaryDk),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bank details aren\'t collected during sign-up yet — you\'ll be prompted to set up payouts securely once your account is approved.',
+                        style: TextStyle(fontSize: 12, color: _C.body, height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Referral code card ────────────────────────────────────
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Referral code (Optional)',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _C.navy)),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF5FD),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _C.primary.withOpacity(0.2)),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      child: TextField(
+                        controller: _referralCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: _C.navy,
+                            letterSpacing: 0.5),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: 'Enter referral code',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Credits your referrer\'s residual income once you\'re approved.',
+                      style: TextStyle(fontSize: 12, color: _C.body),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Submit ─────────────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _C.accent,
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    shadowColor: _C.accent.withOpacity(0.4),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.5, color: Colors.white))
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Submit Application',
+                                style: TextStyle(
+                                    fontSize: 16.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white)),
+                            SizedBox(width: 8),
+                            Icon(Icons.arrow_forward_rounded,
+                                color: Colors.white, size: 20),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'By continuing you confirm that the captured documents belong to you and comply with UK right to work regulations.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11.5, color: _C.body, height: 1.35),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _card({required Widget child}) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: child,
+      );
 
   Widget _field(
     String label,
@@ -436,25 +536,23 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
         children: [
           Text(label,
               style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.white70)),
-          const SizedBox(height: 8),
+                  fontWeight: FontWeight.bold, fontSize: 13, color: _C.body)),
+          const SizedBox(height: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF0b1a3d),
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(color: _C.border),
             ),
             child: TextField(
               controller: ctrl,
               keyboardType: type,
               obscureText: obscure,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
+              style: const TextStyle(color: _C.navy, fontSize: 15),
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: const TextStyle(color: Colors.white24),
+                hintStyle: const TextStyle(color: _C.muted),
                 border: InputBorder.none,
               ),
             ),
@@ -469,32 +567,26 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
         onTap: () => setState(() => _vehicleIdx = idx),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 18),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFF0b1a3d),
+            color: sel ? _C.primaryDk : const Color(0xFFEFF5FD),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: sel
-                  ? const Color(0xFF0392ca)
-                  : Colors.white10,
-              width: 2,
+              color: sel ? _C.primaryDk : Colors.transparent,
+              width: 1.5,
             ),
           ),
           child: Column(
             children: [
-              Icon(icon,
-                  color: sel
-                      ? const Color(0xFF0392ca)
-                      : Colors.white54,
-                  size: 28),
+              Icon(icon, color: sel ? Colors.white : _C.primary, size: 26),
               const SizedBox(height: 6),
               Text(label,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                      color: sel ? Colors.white : Colors.white54,
-                      fontWeight: sel
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      fontSize: 12)),
+                      color: sel ? Colors.white : _C.navy,
+                      fontWeight: sel ? FontWeight.w700 : FontWeight.w600,
+                      fontSize: 11.5,
+                      height: 1.2)),
             ],
           ),
         ),

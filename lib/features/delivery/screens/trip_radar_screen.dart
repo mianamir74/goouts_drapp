@@ -1,5 +1,44 @@
 import 'package:flutter/material.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Rebuilt 7 September 2026 to the light theme design system in
+//  design/STITCH_6_DRAPP.md, using 18_trip_radar_screen as a loose visual
+//  reference — not a literal port.
+//
+//  ⚠ STILL FLAGGED, STILL NOT REAL — same call as 6 September 2026, now
+//  extended to the Stitch reference too. This is a competing concept from
+//  the real dispatch system (acceptFoodOrder/declineFoodOrder, broadcast
+//  offers via new_order_offer_screen.dart): "browse several open trips and
+//  show interest" vs. "first driver to accept a broadcast alert gets it".
+//  Reconciling those is a product decision, not a wiring job, so this stays
+//  visual-shell demo content rather than becoming a second, conflicting
+//  dispatch flow.
+//
+//  Not carried over from the Stitch reference for that reason: its fake
+//  Firestore-shaped broadcast list (Honest Burgers Soho, Rudy's Neapolitan
+//  Pizza, Dishoom Manchester — specific fabricated venues/addresses), its
+//  live 5-second auto-refresh countdown (nothing is actually refreshing),
+//  its "£X.XX GUARANTEED" payout labels (a financial promise this demo
+//  can't back), "Accept Order" button copy (implies this really accepts an
+//  order through the live dispatch pipeline — it doesn't), and its own
+//  5-tab bottom nav duplicating the app's real navigation. Taps now show an
+//  honest "not connected to live orders yet" message instead of doing
+//  nothing at all.
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg        = Color(0xFFF2F4F7);
+  static const surface   = Color(0xFFFFFFFF);
+  static const primary   = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy      = Color(0xFF0D1B3E);
+  static const body      = Color(0xFF475569);
+  static const muted     = Color(0xFF94A3B8);
+  static const paleTint  = Color(0xFFE0F3FB);
+  static const success   = Color(0xFF16A34A);
+  static const accent    = Color(0xFFF97316);
+  static const engineBg  = Color(0xFFE0F2FE);
+}
+
 class TripRadarScreen extends StatefulWidget {
   const TripRadarScreen({super.key});
 
@@ -11,10 +50,27 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
   int _filterIdx = 0;
   static const _filters = ['All Trips', 'Highest Pay', 'Closest'];
 
+  void _notConnected() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Trip Radar is a preview — not connected to live orders yet')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
+      backgroundColor: _C.bg,
+      appBar: AppBar(
+        backgroundColor: _C.surface,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: _C.navy),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Trip Radar',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _C.navy)),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -26,102 +82,50 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Trip Radar',
-                            style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
-                        SizedBox(height: 4),
-                        Text('4 trips available nearby',
-                            style: TextStyle(
-                                color: Colors.white54, fontSize: 14)),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('PREVIEW', style: TextStyle(color: _C.accent, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('3 trips available nearby', style: TextStyle(color: _C.body, fontSize: 14)),
+                        ],
+                      ),
                     ),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0b1a3d),
+                        color: _C.surface,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      child: const Icon(Icons.radar,
-                          color: Color(0xFF0392ca)),
+                      child: const Icon(Icons.radar_rounded, color: _C.primaryDk),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
 
-              // ── Map placeholder ──────────────────────────────────────
-              Container(
-                height: 180,
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: const Color(0xFF0b1a3d),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: CustomPaint(
-                    painter: _RadarMapPainter(),
-                    child: Stack(
-                      children: [
-                        // Pulsing radar rings (static)
-                        Center(
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: const Color(0xFF0392ca)
-                                      .withOpacity(0.15),
-                                  width: 2),
-                            ),
-                          ),
+              // ── Single dispatch engine note ──────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: _C.engineBg.withOpacity(0.6), borderRadius: BorderRadius.circular(16)),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Icon(Icons.info_outline_rounded, size: 18, color: _C.primaryDk),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'This is a preview of what browsing open trips could look like. Right now, orders are offered one driver at a time — see your incoming alert cards.',
+                          style: TextStyle(fontSize: 12, color: _C.navy, height: 1.4, fontWeight: FontWeight.w500),
                         ),
-                        Center(
-                          child: Container(
-                            width: 70,
-                            height: 70,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: const Color(0xFF0392ca)
-                                      .withOpacity(0.3),
-                                  width: 2),
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF0392ca),
-                            ),
-                          ),
-                        ),
-                        // Trip dots
-                        Positioned(
-                            top: 40,
-                            left: 60,
-                            child: _tripDot(const Color(0xFFf97316))),
-                        Positioned(
-                            top: 90,
-                            right: 50,
-                            child: _tripDot(const Color(0xFF0392ca))),
-                        Positioned(
-                            bottom: 40,
-                            left: 80,
-                            child: _tripDot(const Color(0xFF10b981))),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -142,26 +146,15 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
                           onTap: () => setState(() => _filterIdx = i),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: sel
-                                  ? const Color(0xFF0392ca)
-                                  : const Color(0xFF0b1a3d),
+                              color: sel ? _C.primaryDk : _C.surface,
                               borderRadius: BorderRadius.circular(30),
-                              border: Border.all(
-                                  color: sel
-                                      ? Colors.transparent
-                                      : Colors.white10),
+                              border: Border.all(color: sel ? Colors.transparent : const Color(0xFFE2E8F0)),
                             ),
                             child: Text(
                               _filters[i],
-                              style: TextStyle(
-                                  color: sel
-                                      ? Colors.white
-                                      : Colors.white70,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13),
+                              style: TextStyle(color: sel ? Colors.white : _C.body, fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                           ),
                         ),
@@ -181,7 +174,7 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
                 pickup: 'Blue Bottle Coffee, 2nd St',
                 dropoff: '455 Mission District Blvd',
                 tag: 'HIGH DEMAND',
-                tagColor: const Color(0xFFf97316),
+                tagColor: _C.accent,
                 isHighlighted: true,
               ),
               _buildTripCard(
@@ -198,17 +191,15 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
                 pickup: 'Safeway Pharmacy',
                 dropoff: 'Highland Hospital Plaza',
                 tag: 'STACKED ORDER',
-                tagColor: const Color(0xFF0392ca),
+                tagColor: _C.primary,
               ),
 
               const Padding(
                 padding: EdgeInsets.all(20.0),
                 child: Text(
-                  'Orders in Trip Radar are offered to multiple drivers. '
-                  'Showing interest doesn\'t guarantee the order.',
+                  'This is a preview screen. Trips shown here are illustrative and are not live orders.',
                   textAlign: TextAlign.center,
-                  style:
-                      TextStyle(color: Colors.white38, fontSize: 12),
+                  style: TextStyle(color: _C.muted, fontSize: 12),
                 ),
               ),
               const SizedBox(height: 20),
@@ -218,18 +209,6 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
       ),
     );
   }
-
-  Widget _tripDot(Color color) => Container(
-        width: 14,
-        height: 14,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: color.withOpacity(0.5), blurRadius: 6)
-          ],
-        ),
-      );
 
   Widget _buildTripCard({
     required String price,
@@ -245,12 +224,10 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0b1a3d),
+        color: _C.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: isHighlighted
-                ? const Color(0xFFf97316).withOpacity(0.5)
-                : Colors.white.withOpacity(0.05)),
+        border: Border.all(color: isHighlighted ? _C.accent.withOpacity(0.5) : const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,71 +237,49 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
             children: [
               if (tag != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                      color: tagColor!.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(4)),
-                  child: Text(tag,
-                      style: TextStyle(
-                          color: tagColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: tagColor!.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                  child: Text(tag, style: TextStyle(color: tagColor, fontSize: 10, fontWeight: FontWeight.bold)),
                 )
               else
                 const SizedBox(),
-              Text(distance,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+              Text(distance, style: const TextStyle(color: _C.navy, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(price,
-                  style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF10b981))),
+              Text(price, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _C.success)),
               const SizedBox(width: 8),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text('• $time',
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 14)),
+                child: Text('• $time', style: const TextStyle(color: _C.muted, fontSize: 14)),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          _buildLocationRow(
-              Icons.circle, const Color(0xFF0392ca), pickup, 'Pickup'),
+          _buildLocationRow(Icons.circle, _C.primary, pickup, 'Pickup'),
           const SizedBox(height: 12),
-          _buildLocationRow(Icons.location_on,
-              const Color(0xFFf97316), dropoff, 'Dropoff'),
+          _buildLocationRow(Icons.location_on, _C.accent, dropoff, 'Dropoff'),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: _notConnected,
               style: ElevatedButton.styleFrom(
-                backgroundColor: isHighlighted
-                    ? const Color(0xFFf97316)
-                    : const Color(0xFF031134),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                backgroundColor: isHighlighted ? _C.accent : _C.paleTint,
+                foregroundColor: isHighlighted ? Colors.white : _C.primaryDk,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Icon(Icons.touch_app_outlined),
                   SizedBox(width: 12),
-                  Text('Show Interest',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Show Interest', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ],
               ),
             ),
@@ -334,8 +289,7 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
     );
   }
 
-  Widget _buildLocationRow(
-      IconData icon, Color color, String location, String label) {
+  Widget _buildLocationRow(IconData icon, Color color, String location, String label) {
     return Row(
       children: [
         Icon(icon, size: 12, color: color),
@@ -343,38 +297,11 @@ class _TripRadarScreenState extends State<TripRadarScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white38, fontSize: 10)),
-            Text(location,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500)),
+            Text(label, style: const TextStyle(color: _C.muted, fontSize: 10)),
+            Text(location, style: const TextStyle(color: _C.navy, fontSize: 14, fontWeight: FontWeight.w500)),
           ],
         ),
       ],
     );
   }
-}
-
-class _RadarMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.03)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-
-    // Grid lines
-    for (double x = 0; x < size.width; x += 30) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += 30) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
 }

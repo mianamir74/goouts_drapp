@@ -5,14 +5,25 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
+// ⚠ FIXED 7 September 2026. This never checked food_drivers, the real
+// collection every goouts_drapp food delivery driver actually lives in — it
+// only knew about cab_drivers, businesses, and a generic drivers fallback.
+// A food driver opening My Referrals silently resolved to 'drivers', a
+// collection they have no document in, so summary counts, referral code and
+// sent invites all read as empty even though the driver has a real
+// food_drivers profile with driverReferralCount/merchantReferralCount
+// already reserved for exactly this. Same fix applied in
+// referral_link_screen.dart, keep both in agreement.
 Future<String> _resolveDriverCollection(String uid) async {
   final firestore = FirebaseFirestore.instance;
   final results = await Future.wait([
-    firestore.collection('cab_drivers').doc(uid).get(),
     firestore.collection('businesses').doc(uid).get(),
+    firestore.collection('cab_drivers').doc(uid).get(),
+    firestore.collection('food_drivers').doc(uid).get(),
   ]);
-  if (results[0].exists) return 'cab_drivers';
-  if (results[1].exists) return 'businesses';
+  if (results[0].exists) return 'businesses';
+  if (results[1].exists) return 'cab_drivers';
+  if (results[2].exists) return 'food_drivers';
   return 'drivers';
 }
 

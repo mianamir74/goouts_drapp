@@ -38,6 +38,15 @@
 	<string>GoOuts needs your camera to photograph your identity document and take a verification selfie, so we can confirm who you are before you start delivering.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>GoOuts needs access to your photos so you can choose an existing picture of your identity document or profile photo instead of taking a new one.</string>
+	<!-- ⚠ ADDED 6 September 2026. Without this key, Apple holds every
+	     TestFlight upload in "Missing Compliance" until someone manually
+	     answers the export-compliance question for THAT SPECIFIC BUILD in
+	     App Store Connect — the build never appears as testable until then.
+	     This app only uses standard HTTPS/TLS (Firebase, REST APIs) and no
+	     custom cryptography, which is exempt — same as goouts_host, which
+	     already declares this and has never had the problem. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

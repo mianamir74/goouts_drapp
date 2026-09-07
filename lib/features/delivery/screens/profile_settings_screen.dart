@@ -4,7 +4,57 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../services/theme_provider.dart';
+import '../../referral/referral_link_screen.dart';
+import '../../referral/referral_list_screen.dart';
+import '../../referral/merchant_invite_screen.dart';
 import 'identity_verification_screen.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reskinned 7 September 2026 to the light theme design system in
+//  design/STITCH_6_DRAPP.md, using 09_profile_settings_screen as the visual
+//  reference.
+//
+//  ⚠ NOT carried over from the Stitch mockup: the fake driver identity
+//  ("Callum Wright", a stock Unsplash avatar photo, "184 trips", "96.8%
+//  Acceptance", "Soho • Fitzrovia" active zone — no zone concept exists),
+//  the per-document fabricated statuses ("Passport verified", "Certificate
+//  submitted", "Right to Work — Share code approved" — none of these are
+//  real fields, and there is no UK right-to-work share-code integration
+//  anywhere in this app), the Audio Alerts row ("Loud — Helmet speaker" —
+//  an invented specific hardware preference with no backend), and the fake
+//  "Account identifier GB-DRV-9024" (drivers are identified by their real
+//  Firebase uid, not that scheme). The hero card below uses only real
+//  `food_drivers` fields: name, photo, rating, totalDeliveries,
+//  acceptanceRate, vehicleType, and tier.
+//
+//  ⚠ REMOVED 7 September 2026 — the "Bank Details •••• •••• •••• 4289
+//  Verified" tile. Same problem as the bank fields removed from
+//  dapp_registration_screen.dart today: a fabricated card number and a
+//  false "Verified" claim on a dead onTap. Replaced with the same honest
+//  "not collected yet" notice used there.
+//
+//  ⚠ CRITICAL: the Light Mode toggle below is real — it drives the actual
+//  app-wide ThemeProvider, exactly as before this pass. The Stitch mockup's
+//  own Light Mode toggle was fake local state (`bool _isLightMode`); this
+//  screen was never going to use that, since the real one already existed
+//  and worked.
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg       = Color(0xFFF2F4F7);
+  static const surface  = Color(0xFFFFFFFF);
+  static const primary  = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy     = Color(0xFF0D1B3E);
+  static const accent   = Color(0xFFF97316);
+  static const paleTint = Color(0xFFE0F3FB);
+  static const softBlueBox = Color(0xFFEFF4FF);
+  static const body     = Color(0xFF475569);
+  static const muted    = Color(0xFF94A3B8);
+  static const success  = Color(0xFF16A34A);
+  static const error    = Color(0xFFDC2626);
+  static const errorBg  = Color(0xFFFEE2E2);
+  static const border   = Color(0xFFE2E8F0);
+}
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -37,21 +87,23 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0b1a3d),
-        title: const Text('Sign Out',
-            style: TextStyle(color: Colors.white)),
-        content: const Text('Are you sure you want to sign out?',
-            style: TextStyle(color: Colors.white70)),
+        backgroundColor: _C.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Sign Out', style: TextStyle(color: _C.navy, fontWeight: FontWeight.w800)),
+        content: const Text('Are you sure you want to sign out? Live dispatch offers will pause.',
+            style: TextStyle(color: _C.body, fontSize: 13.5)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: _C.muted)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign Out',
-                style: TextStyle(color: Color(0xFFf43f5e))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _C.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Sign Out', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -63,132 +115,164 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     }
   }
 
+  String _vehicleLabel(String? v) {
+    switch (v) {
+      case 'bicycle': return 'Bicycle';
+      case 'scooter': return 'Scooter';
+      case 'car':     return 'Car';
+      default:        return 'Courier';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
-    final name    = _driver?['name']           ?? 'Alex Rodriguez';
+    final name    = (_driver?['name'] as String?)?.trim();
     final photo   = _driver?['profilePhotoUrl'] as String?;
-    final rating  = (_driver?['rating']         ?? 4.92).toDouble();
-    final trips   = _driver?['totalDeliveries'] ?? 3421;
-    final tier    = _driver?['tier']            ?? 'Gold Partner';
-    final tierPts = _driver?['ptsToNextTier']   ?? 45;
-    final tierProg = (_driver?['tierProgress']  ?? 0.75).toDouble();
-
-    final licenseOk   = _driver?['licenseVerified']   ?? true;
-    final insuranceOk = _driver?['insuranceVerified']  ?? false;
+    final rating  = (_driver?['rating']         ?? 5.0).toDouble();
+    final trips   = (_driver?['totalDeliveries'] ?? 0) as int;
+    final tier    = (_driver?['tier'] as String?) ?? 'Bronze';
+    final acceptance = (_driver?['acceptanceRate'] ?? 94).toDouble();
+    final vehicle = _vehicleLabel(_driver?['vehicleType'] as String?);
+    final displayName = (name == null || name.isEmpty) ? 'Driver' : name;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
+      backgroundColor: _C.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF031134),
-        elevation: 0,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
+        backgroundColor: _C.surface,
+        elevation: 0.5,
         title: const Text('GoOuts Driver',
-            style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20)),
+            style: TextStyle(color: _C.navy, fontWeight: FontWeight.bold, fontSize: 20)),
         centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 17,
-              backgroundColor: const Color(0xFF0b1a3d),
-              backgroundImage: photo != null ? NetworkImage(photo) : null,
-              child: photo == null
-                  ? Text(name.isNotEmpty ? name[0].toUpperCase() : 'D',
-                      style: const TextStyle(color: Colors.white))
-                  : null,
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         child: Column(
           children: [
 
-            // ── Profile card ─────────────────────────────────────────
+            // ── Profile hero card ─────────────────────────────────────
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFF0b1a3d),
-                borderRadius: BorderRadius.circular(20),
+                color: _C.surface,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2)),
+                ],
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Stack(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 38,
-                        backgroundColor: const Color(0xFF031134),
-                        backgroundImage: photo != null
-                            ? NetworkImage(photo)
-                            : null,
-                        child: photo == null
-                            ? Text(
-                                name.isNotEmpty
-                                    ? name[0].toUpperCase()
-                                    : 'D',
-                                style: const TextStyle(
-                                    fontSize: 28,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold))
-                            : null,
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF0392ca),
-                            shape: BoxShape.circle,
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 34,
+                            backgroundColor: _C.paleTint,
+                            backgroundImage: photo != null ? NetworkImage(photo) : null,
+                            child: photo == null
+                                ? Text(displayName[0].toUpperCase(),
+                                    style: const TextStyle(
+                                        fontSize: 26, color: _C.primary, fontWeight: FontWeight.bold))
+                                : null,
                           ),
-                          child: const Icon(Icons.check,
-                              size: 12, color: Colors.white),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(color: _C.primary, shape: BoxShape.circle),
+                              child: const Icon(Icons.check, size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(displayName,
+                                style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: _C.navy)),
+                            const SizedBox(height: 2),
+                            Text('$vehicle • $tier Tier',
+                                style: const TextStyle(fontSize: 12.5, color: _C.body, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCEBFA),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.star_outline_rounded, size: 15, color: _C.primaryDk),
+                                  const SizedBox(width: 4),
+                                  Text('${rating.toStringAsFixed(2)} Rating',
+                                      style: const TextStyle(
+                                          fontSize: 12, fontWeight: FontWeight.w700, color: _C.primaryDk)),
+                                  const SizedBox(width: 6),
+                                  Container(width: 3.5, height: 3.5,
+                                      decoration: const BoxDecoration(color: _C.primaryDk, shape: BoxShape.circle)),
+                                  const SizedBox(width: 6),
+                                  Text('${_formatTrips(trips)} trips',
+                                      style: const TextStyle(
+                                          fontSize: 12, fontWeight: FontWeight.w600, color: _C.primaryDk)),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(child: _metricBox('Deliveries', '$trips')),
+                      const SizedBox(width: 10),
+                      Expanded(child: _metricBox('Acceptance', '${acceptance.toInt()}%')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── Light mode toggle — REAL, drives ThemeProvider ──────────
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: _C.surface,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _settingIcon(Icons.wb_sunny_outlined),
+                  const SizedBox(width: 12),
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name,
-                            style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
-                        const SizedBox(height: 6),
-                        Row(children: [
-                          const Icon(Icons.star,
-                              color: Color(0xFFf97316), size: 16),
-                          const SizedBox(width: 4),
-                          Text(rating.toStringAsFixed(2),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: Colors.white)),
-                          const SizedBox(width: 8),
-                          Text('• ${_formatTrips(trips)} Trips',
-                              style: const TextStyle(
-                                  color: Colors.white54, fontSize: 13)),
-                        ]),
+                        Text('Light Mode',
+                            style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _C.navy)),
+                        SizedBox(height: 2),
+                        Text('Switch to a light layout for better daytime visibility',
+                            style: TextStyle(fontSize: 11.5, color: _C.body)),
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined,
-                        color: Colors.white54, size: 22),
-                    onPressed: () {},
+                  Switch.adaptive(
+                    value: themeProvider.isLight,
+                    onChanged: themeProvider.toggle,
+                    activeThumbColor: _C.primaryDk,
                   ),
                 ],
               ),
@@ -196,111 +280,27 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
             const SizedBox(height: 14),
 
-            // ── Tier progress ─────────────────────────────────────────
+            // ── Payout details — honestly not collected yet ──────────
             Container(
-              padding: const EdgeInsets.all(18),
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF0b1a3d),
-                borderRadius: BorderRadius.circular(18),
+                color: _C.paleTint,
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('CURRENT TIER',
-                          style: TextStyle(
-                              color: Colors.white38,
-                              fontSize: 11,
-                              letterSpacing: 1.2,
-                              fontWeight: FontWeight.bold)),
-                      Text('$tierPts pts to Platinum',
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 12)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    const Text('- ',
-                        style: TextStyle(
-                            color: Colors.white54, fontSize: 16)),
-                    Text(tier,
-                        style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0392ca))),
-                  ]),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: tierProg,
-                      minHeight: 8,
-                      backgroundColor: Colors.white10,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                          Color(0xFF0392ca)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // ── Light mode toggle ─────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0b1a3d),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    const Icon(Icons.light_mode_outlined,
-                        color: Colors.white, size: 22),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Text('Light Mode',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white)),
-                    ),
-                    Switch(
-                      value: themeProvider.isLight,
-                      onChanged: themeProvider.toggle,
-                      activeThumbColor: const Color(0xFF0392ca),
-                    ),
-                  ]),
-                  const SizedBox(height: 4),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 36),
+                children: const [
+                  Icon(Icons.info_outline_rounded, size: 16, color: _C.primaryDk),
+                  SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      'Switch to a light layout for better daytime visibility',
-                      style: TextStyle(
-                          color: Colors.white38, fontSize: 12),
+                      'Bank details aren\'t collected yet — payout setup will appear here once it\'s ready.',
+                      style: TextStyle(fontSize: 12, color: _C.body, height: 1.35),
                     ),
                   ),
                 ],
               ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // ── Bank details ──────────────────────────────────────────
-            _settingTile(
-              icon: Icons.account_balance_outlined,
-              title: 'Bank Details',
-              subtitle: '•••• •••• •••• 4289',
-              trailing: const Text('Verified',
-                  style: TextStyle(
-                      color: Color(0xFF10b981),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13)),
-              onTap: () {},
             ),
 
             const SizedBox(height: 14),
@@ -310,40 +310,109 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               icon: Icons.description_outlined,
               title: 'Documents',
               subtitle: 'Manage your required paperwork',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _docBadge('License', licenseOk),
-                  const SizedBox(width: 8),
-                  _docBadge('Insurance', insuranceOk),
-                ],
-              ),
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        const IdentityVerificationScreen()),
+                MaterialPageRoute(builder: (_) => const IdentityVerificationScreen()),
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 14),
+
+            // ── Invite a Driver ───────────────────────────────────────
+            _settingTile(
+              icon: Icons.person_add_alt_1_outlined,
+              title: 'Invite a Driver',
+              subtitle: 'Share your code, earn a residual on their deliveries',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReferralLinkScreen()),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── My Referrals ──────────────────────────────────────────
+            _settingTile(
+              icon: Icons.groups_outlined,
+              title: 'My Referrals',
+              subtitle: 'Track who has joined and who is still pending',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReferralListScreen()),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── Invite a Merchant ─────────────────────────────────────
+            _settingTile(
+              icon: Icons.storefront_outlined,
+              title: 'Invite a Merchant',
+              subtitle: 'Invite a restaurant to join GoOuts as a partner',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MerchantInviteScreen()),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // ── App Language — informational only; the app is English
+            // (UK) only today, so a picker with one option would be
+            // decorative. Kept as a plain, honest label.
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: _C.surface,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _settingIcon(Icons.language_rounded),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('App Language',
+                        style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _C.navy)),
+                  ),
+                  const Text('English (UK)', style: TextStyle(fontSize: 12.5, color: _C.body)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
 
             // ── Sign Out ──────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: _signOut,
-                icon: const Icon(Icons.logout_outlined, size: 20),
-                label: const Text('Sign Out',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFf43f5e),
-                  side: BorderSide(
-                      color: const Color(0xFFf43f5e).withOpacity(0.5)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+            InkWell(
+              onTap: _signOut,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _C.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(color: _C.errorBg, borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.logout_rounded, color: _C.error, size: 20),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text('Sign out',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _C.error)),
+                    ),
+                    const Icon(Icons.arrow_forward_rounded, size: 18, color: _C.muted),
+                  ],
                 ),
               ),
             ),
@@ -355,11 +424,30 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     );
   }
 
+  Widget _metricBox(String label, String value) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: _C.softBlueBox, borderRadius: BorderRadius.circular(14)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.body)),
+            const SizedBox(height: 4),
+            Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _C.navy)),
+          ],
+        ),
+      );
+
+  Widget _settingIcon(IconData icon) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(color: _C.softBlueBox, borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: _C.primaryDk, size: 20),
+      );
+
   Widget _settingTile({
     required IconData icon,
     required String title,
     required String subtitle,
-    Widget? trailing,
     VoidCallback? onTap,
   }) =>
       GestureDetector(
@@ -367,76 +455,30 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFF0b1a3d),
+            color: _C.surface,
             borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 2)),
+            ],
           ),
           child: Row(
             children: [
-              Icon(icon, color: Colors.white, size: 22),
-              const SizedBox(width: 14),
+              _settingIcon(icon),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title,
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                    const SizedBox(height: 4),
-                    if (trailing == null)
-                      Text(subtitle,
-                          style: const TextStyle(
-                              color: Colors.white38, fontSize: 13))
-                    else ...[
-                      Text(subtitle,
-                          style: const TextStyle(
-                              color: Colors.white38, fontSize: 13)),
-                      const SizedBox(height: 8),
-                      trailing,
-                    ],
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _C.navy)),
+                    const SizedBox(height: 3),
+                    Text(subtitle, style: const TextStyle(color: _C.body, fontSize: 12.5)),
                   ],
                 ),
               ),
-              if (trailing == null) ...[
-                trailing ?? const SizedBox.shrink(),
-                const Icon(Icons.chevron_right, color: Colors.white24),
-              ] else
-                const Icon(Icons.chevron_right, color: Colors.white24),
+              const Icon(Icons.chevron_right_rounded, color: _C.muted),
             ],
           ),
-        ),
-      );
-
-  Widget _docBadge(String label, bool ok) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: ok
-              ? const Color(0xFF10b981).withOpacity(0.12)
-              : const Color(0xFFf43f5e).withOpacity(0.12),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: ok
-                  ? const Color(0xFF10b981).withOpacity(0.4)
-                  : const Color(0xFFf43f5e).withOpacity(0.4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              ok ? Icons.check_circle_outline : Icons.warning_amber_rounded,
-              size: 13,
-              color: ok ? const Color(0xFF10b981) : const Color(0xFFf43f5e),
-            ),
-            const SizedBox(width: 4),
-            Text(label,
-                style: TextStyle(
-                    color: ok
-                        ? const Color(0xFF10b981)
-                        : const Color(0xFFf43f5e),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold)),
-          ],
         ),
       );
 

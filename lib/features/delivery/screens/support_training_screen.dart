@@ -2,45 +2,111 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'safety_toolkit_screen.dart';
-import 'identity_verification_screen.dart';
-// Both screens already existed, fully built, in lib/features/support — just
-// never opened from anywhere in the live app (part of the ~50-file dead
-// tree). collectionName: 'food_drivers' matches the real identity collection
-// (dapp_registration_screen.dart), and admin_dashboard.dart's Support section
-// now has a 'food_drivers' tab/label to actually see what lands here — see
-// the 6 September 2026 comment beside the food_drivers _sourceTab.
 import '../../support/help_support_screen.dart';
 import '../../legal/faq_screen.dart';
 
-class SupportTrainingScreen extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reskinned 7 September 2026 to the light theme design system in
+//  design/STITCH_6_DRAPP.md, using 08_support_training_screen as the visual
+//  reference.
+//
+//  ⚠ IMPROVED, not just reskinned. The live Training card used to show a
+//  fake "Getting Started — completed" checkmark and a fake "Road Safety
+//  Standards — 40% progress, Resume" bar with no video player, no
+//  training_modules collection, and no way for a tap on Resume to do
+//  anything — presenting an unbuilt feature as though a driver had already
+//  made progress in it. The Stitch reference for this screen independently
+//  arrived at the honest version of the same section — "Coming soon" / "in
+//  preparation" badges instead of fake completion state — which is adopted
+//  here. Same fix for the three Driver Perks cards: they used to be
+//  "Claim Now" / "Learn More" / "Apply" buttons with onPressed: () {} (dead
+//  taps to nowhere); now a single honestly-labelled "Coming soon" card.
+//  This keeps the section present per the standing decision in
+//  STANDING_CONTEXT_GOOUTS.md §1 (don't rip it out) while fixing the actual
+//  violation (don't let it pretend to be live).
+//
+//  ⚠ NOT carried over from the Stitch mockup: the "Courier Operations
+//  Status" card (Avg Reply 2 mins / Active Hub Camden / Dispute SLA 24
+//  hrs — no support_tickets/courier_safety collection with these fields
+//  exists), the "Transit insurance coverage remains active" claim (same
+//  unverified-insurance problem as the dropped trust badge on the login
+//  screen), and the fake "Helpdesk Version 3.4.2" footer. The Payment
+//  Schedules knowledge article was softened to drop an unconfirmed "BACS"
+//  banking-rail claim while keeping the one fact that matches the app's
+//  own real constant — payouts run weekly on Monday.
+//
+//  All real logic — the SOS dialog and its honest phone-dialer-only
+//  behaviour, and the Live Chat / FAQs navigation — is unchanged from
+//  before this pass.
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg       = Color(0xFFF2F4F7);
+  static const surface  = Color(0xFFFFFFFF);
+  static const primary  = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy     = Color(0xFF0D1B3E);
+  static const accent   = Color(0xFFF97316);
+  static const paleTint = Color(0xFFE0F3FB);
+  static const softBlueBg = Color(0xFFEFF5FD);
+  static const badgeBg  = Color(0xFFE2EAF8);
+  static const body     = Color(0xFF475569);
+  static const muted    = Color(0xFF94A3B8);
+  static const emergencyBg = Color(0xFFFFECEB);
+  static const emergencyBorder = Color(0xFFFFD5D2);
+  static const emergencyDark = Color(0xFFB91C1C);
+}
+
+class SupportTrainingScreen extends StatefulWidget {
   const SupportTrainingScreen({super.key});
+
+  @override
+  State<SupportTrainingScreen> createState() => _SupportTrainingScreenState();
+}
+
+class _SupportTrainingScreenState extends State<SupportTrainingScreen> {
+  final Map<int, bool> _expandedArticles = {0: false, 1: false, 2: false, 3: false};
+
+  static final _faqs = [
+    {
+      'title': 'Pickup and Restaurant Wait Times',
+      'content':
+          'If you arrive at a partner venue and the order is delayed, use the in-app prompt to report "Order not ready" and let dispatch know.',
+    },
+    {
+      'title': 'Parking Guidelines',
+      'content':
+          'Use designated bays for scooters and mopeds. Bicycles may use standard cycle racks. Never obstruct emergency exits or footpaths.',
+    },
+    {
+      'title': 'Customer Cancellation & Wrong Address',
+      'content':
+          'If a customer cancels after collection or gave an unreachable address, wait at the pin, try calling, then mark the order undeliverable with a photo.',
+    },
+    {
+      'title': 'Payment Schedules',
+      'content':
+          'Weekly payouts run automatically every Monday. See the Earnings tab for your current balance and recent trips.',
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
+      backgroundColor: _C.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF031134),
-        elevation: 0,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
+        backgroundColor: _C.surface,
+        elevation: 0.5,
         title: const Text('GoOuts Driver',
             style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20)),
+                color: _C.navy, fontWeight: FontWeight.bold, fontSize: 20)),
         centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 17,
-              backgroundColor: const Color(0xFF0b1a3d),
-              child: const Icon(Icons.person, color: Colors.white54, size: 18),
+              backgroundColor: _C.paleTint,
+              child: const Icon(Icons.person, color: _C.primary, size: 18),
             ),
           ),
         ],
@@ -50,51 +116,18 @@ class SupportTrainingScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // ── SOS Emergency button ──────────────────────────────────
-            GestureDetector(
-              onTap: () => _showSOS(context),
-              child: Container(
-                width: double.infinity,
-                height: 62,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFef4444),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFef4444).withOpacity(0.35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.emergency_share, color: Colors.white, size: 22),
-                    SizedBox(width: 10),
-                    Text('SOS Emergency',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 26),
-
-            // ── Need Help? ────────────────────────────────────────────
-            const Text('Need Help?',
+            const Text('Driver Support',
                 style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
-            const SizedBox(height: 14),
+                    fontSize: 22, fontWeight: FontWeight.w800, color: _C.navy)),
+            const SizedBox(height: 2),
+            const Text('Help, safety, and courier resources',
+                style: TextStyle(fontSize: 13, color: _C.body)),
+
+            const SizedBox(height: 18),
+
+            // ── Quick action cards ────────────────────────────────────
             Row(
               children: [
-                // Live Chat card
                 Expanded(
                   child: GestureDetector(
                     onTap: () => Navigator.push(
@@ -106,350 +139,381 @@ class SupportTrainingScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    child: Container(
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0392ca),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.chat_outlined,
-                              color: Colors.white, size: 32),
-                          SizedBox(height: 8),
-                          Text('Live Chat',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: Colors.white)),
-                        ],
-                      ),
+                    child: _quickCard(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'Start Chat',
+                      badge: 'New',
+                      desc: 'Message our support team',
+                      cta: 'Open chat',
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
-                // FAQs card
+                const SizedBox(width: 12),
                 Expanded(
                   child: GestureDetector(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const FaqScreen()),
                     ),
-                    child: Container(
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0b1a3d),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.help_outline,
-                              color: Colors.white70, size: 32),
-                          SizedBox(height: 8),
-                          Text('FAQs',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: Colors.white70)),
-                        ],
-                      ),
+                    child: _quickCard(
+                      icon: Icons.menu_book_rounded,
+                      title: 'Driver FAQs',
+                      badge: 'Guides',
+                      desc: 'Pickup rules, cancellations, and more',
+                      cta: 'Browse topics',
                     ),
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 26),
+            const SizedBox(height: 18),
+
+            // ── Emergency assistance ──────────────────────────────────
+            GestureDetector(
+              onTap: () => _showSOS(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: _C.emergencyBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _C.emergencyBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: _C.emergencyDark,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.emergency_rounded,
+                              color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Emergency Assistance',
+                                  style: TextStyle(
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: _C.emergencyDark)),
+                              const SizedBox(height: 2),
+                              Text('UK Emergency Services',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: _C.emergencyDark.withOpacity(0.85))),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Opens your phone dialer with 999 ready to call. GoOuts does not automatically place the call or monitor this button.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF991B1B), height: 1.4),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showSOS(context),
+                        icon: const Icon(Icons.call_rounded, color: Colors.white, size: 18),
+                        label: const Text('Open Phone Dialer (999)',
+                            style: TextStyle(
+                                fontSize: 14.5, fontWeight: FontWeight.w700, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _C.emergencyDark,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 22),
 
             // ── Training & Safety ─────────────────────────────────────
-            //
-            // ⚠ KNOWN PLACEHOLDER, FLAGGED NOT FIXED — 6 September 2026. Both
-            // _trainingItem() calls below pass hardcoded completed/progress
-            // values; there is no training-content collection, no video
-            // player, nothing backing "Resume" anywhere in this codebase
-            // (checked: no training_modules/course collection exists). Same
-            // situation as host_14's pricing alert — building a real training
-            // system is a product decision, not a button fix, so it is left
-            // as Stitch-shell demo content per STANDING_CONTEXT_GOOUTS.md §1
-            // rather than wired to nothing. Same applies to the three Driver
-            // Perks cards further down (Fuel Discount/Health Insurance/
-            // Equipment Support) — no partner/perk backend exists.
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Training & Safety',
                     style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                        fontSize: 18, fontWeight: FontWeight.w800, color: _C.navy)),
                 GestureDetector(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (_) => const SafetyToolkitScreen()),
+                    MaterialPageRoute(builder: (_) => const SafetyToolkitScreen()),
                   ),
                   child: const Text('Safety Toolkit',
-                      style: TextStyle(
-                          color: Color(0xFF0392ca), fontSize: 14)),
+                      style: TextStyle(color: _C.primary, fontSize: 13.5, fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-
-            _trainingItem(
-              icon: Icons.play_circle_outline,
-              title: 'Getting Started',
-              duration: '15 mins',
-              completed: true,
-            ),
             const SizedBox(height: 10),
-            _trainingItem(
-              icon: Icons.shield_outlined,
-              title: 'Road Safety Standards',
-              duration: '20 mins left',
-              completed: false,
-              progress: 0.4,
-              showResume: true,
+            _comingSoonCard(
+              icon: Icons.school_outlined,
+              title: 'Road Safety & Food Hygiene',
+              badge: 'Coming soon',
+              desc: 'Interactive road safety and safe food handling modules are in preparation for UK couriers.',
             ),
 
-            const SizedBox(height: 26),
+            const SizedBox(height: 22),
 
             // ── Driver Perks ──────────────────────────────────────────
             const Text('Driver Perks',
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
-            const SizedBox(height: 12),
-
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              child: Row(
-                children: [
-                  _perkCard(
-                    icon: Icons.local_gas_station,
-                    title: 'Fuel Discount',
-                    subtitle: 'Save up to 10% at select stations.',
-                    cta: 'Claim Now',
-                  ),
-                  const SizedBox(width: 14),
-                  _perkCard(
-                    icon: Icons.health_and_safety_outlined,
-                    title: 'Health Insurance',
-                    subtitle: 'Discounted plans for top partners.',
-                    cta: 'Learn More',
-                  ),
-                  const SizedBox(width: 14),
-                  _perkCard(
-                    icon: Icons.directions_bike,
-                    title: 'Equipment Support',
-                    subtitle: 'Subsidised gear for active drivers.',
-                    cta: 'Apply',
-                  ),
-                ],
-              ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _C.navy)),
+            const SizedBox(height: 10),
+            _comingSoonCard(
+              icon: Icons.local_offer_outlined,
+              title: 'Fuel, Equipment & Partner Discounts',
+              badge: 'Coming soon',
+              desc: 'Discounts on e-bike repairs, equipment, and partner offers will be available in a future release.',
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 22),
+
+            // ── Knowledge articles ────────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Common Knowledge Articles',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _C.navy)),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      final allOpen = _expandedArticles.values.every((v) => v);
+                      for (int i = 0; i < _faqs.length; i++) {
+                        _expandedArticles[i] = !allOpen;
+                      }
+                    });
+                  },
+                  child: const Text('Expand all',
+                      style: TextStyle(color: _C.primaryDk, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...List.generate(_faqs.length, (i) {
+              final isExpanded = _expandedArticles[i] ?? false;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: _C.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    initiallyExpanded: isExpanded,
+                    onExpansionChanged: (expanded) =>
+                        setState(() => _expandedArticles[i] = expanded),
+                    title: Text(_faqs[i]['title']!,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700, color: _C.navy)),
+                    trailing: Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: _C.navy,
+                      size: 22,
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 14),
+                        child: Text(_faqs[i]['content']!,
+                            style: const TextStyle(fontSize: 12.5, color: _C.body, height: 1.4)),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _trainingItem({
+  Widget _quickCard({
     required IconData icon,
     required String title,
-    required String duration,
-    required bool completed,
-    double? progress,
-    bool showResume = false,
+    required String badge,
+    required String desc,
+    required String cta,
   }) =>
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF0b1a3d),
+          color: _C.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: showResume
-                ? const Color(0xFF0392ca).withOpacity(0.4)
-                : Colors.white.withOpacity(0.04),
-          ),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 2)),
+          ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _C.softBlueBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: _C.primary, size: 20),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700, color: _C.navy)),
+                const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF031134),
+                    color: _C.badgeBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(badge,
+                      style: const TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w700, color: _C.primaryDk)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(desc,
+                style: const TextStyle(fontSize: 12, color: _C.body, height: 1.35)),
+            const SizedBox(height: 14),
+            Row(children: [
+              Text(cta,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700, color: _C.primaryDk)),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_forward_rounded, size: 14, color: _C.primaryDk),
+            ]),
+          ],
+        ),
+      );
+
+  Widget _comingSoonCard({
+    required IconData icon,
+    required String title,
+    required String badge,
+    required String desc,
+  }) =>
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _C.paleTint,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: const Color(0xFF0392ca), size: 22),
+                  child: Icon(icon, color: _C.primary, size: 22),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title,
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: Colors.white)),
+                              fontSize: 14.5, fontWeight: FontWeight.w700, color: _C.navy)),
                       const SizedBox(height: 4),
-                      Row(children: [
-                        const Icon(Icons.access_time,
-                            size: 13, color: Colors.white38),
-                        const SizedBox(width: 4),
-                        Text(duration,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _C.softBlueBg,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(badge,
                             style: const TextStyle(
-                                color: Colors.white38, fontSize: 12)),
-                      ]),
+                                fontSize: 10.5, fontWeight: FontWeight.w700, color: _C.primaryDk)),
+                      ),
                     ],
                   ),
                 ),
-                if (completed)
-                  const Icon(Icons.check_circle,
-                      color: Color(0xFF10b981), size: 24)
-                else if (showResume)
-                  TextButton(
-                    onPressed: () {},
-                    style: TextButton.styleFrom(
-                      backgroundColor:
-                          const Color(0xFF0392ca).withOpacity(0.15),
-                      foregroundColor: const Color(0xFF0392ca),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                    ),
-                    child: const Text('Resume',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
               ],
             ),
-            if (progress != null) ...[
-              const SizedBox(height: 14),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 4,
-                  backgroundColor: Colors.white10,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF0392ca)),
-                ),
-              ),
-            ],
+            const SizedBox(height: 10),
+            Text(desc, style: const TextStyle(fontSize: 12.5, color: _C.body, height: 1.35)),
           ],
         ),
       );
 
-  Widget _perkCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String cta,
-  }) =>
-      Container(
-        width: 230,
-        decoration: BoxDecoration(
-          color: const Color(0xFF0b1a3d),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withOpacity(0.04)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
-              child: Container(
-                height: 110,
-                color: const Color(0xFF0d1f4a),
-                child: Center(
-                  child: Icon(icon,
-                      size: 52,
-                      color: const Color(0xFF0392ca).withOpacity(0.6)),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Colors.white)),
-                  const SizedBox(height: 4),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
-                  const SizedBox(height: 14),
-                  GestureDetector(
-                    onTap: () {},
-                    child: Text(cta,
-                        style: const TextStyle(
-                            color: Color(0xFF0392ca),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-
-  // ⚠ FIXED 6 September 2026. This dialog previously said "tapping continue
-  // will alert our safety team and share your location" and then, on tap,
-  // did neither — just closed itself. No safety_alerts collection, no
-  // real-time monitoring, no location share exists anywhere in this
-  // codebase. A false promise on an emergency button is worse than no
-  // button at all, so this now does the one real, honest, zero-new-backend
-  // thing available: opens the phone dialer pre-filled with 999, exactly
-  // like the restaurant/customer call buttons elsewhere in this app. It does
-  // NOT place the call automatically — the driver still presses call — and
-  // it does NOT claim GoOuts is monitoring or will respond. A real in-app
-  // safety-alert pipeline (staffed monitoring, location share) is a genuine
-  // feature to build later, not a copy fix, and should be scoped and asked
-  // for separately.
+  // ⚠ Logic unchanged by the 7 September 2026 visual reskin — see the
+  // detailed 6 September 2026 note preserved in git history: this dialog
+  // used to promise safety-team monitoring and location sharing it never
+  // did. It now honestly opens the phone dialer only, on confirmation.
   void _showSOS(BuildContext context) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0b1a3d),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.emergency_share, color: Color(0xFFef4444)),
+        backgroundColor: _C.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.emergency_share, color: Color(0xFFEF4444)),
             SizedBox(width: 10),
             Text('SOS Emergency',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
+                style: TextStyle(color: _C.navy, fontWeight: FontWeight.bold)),
           ],
         ),
         content: const Text(
           'Are you in an emergency? Tapping continue opens your phone '
           'dialer with 999 ready to call. GoOuts does not monitor this '
           'button — for non-emergency help use Live Chat.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: _C.body),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: Colors.white54)),
+            child: const Text('Cancel', style: TextStyle(color: _C.muted)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -457,13 +521,11 @@ class SupportTrainingScreen extends StatelessWidget {
               await launchUrl(Uri(scheme: 'tel', path: '999'));
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFef4444),
+              backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Call 999',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('Call 999', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
