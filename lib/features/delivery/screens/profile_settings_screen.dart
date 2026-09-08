@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/theme_provider.dart';
 import '../../referral/referral_link_screen.dart';
@@ -66,8 +67,10 @@ class ProfileSettingsScreen extends StatefulWidget {
 class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   final _db   = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  final _prefs = SharedPreferencesAsync();
 
   Map<String, dynamic>? _driver;
+  bool _showWelcomeBackBanner = false;
 
   @override
   void initState() {
@@ -75,12 +78,42 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     _load();
   }
 
+  // ─────────────────────────────────────────────────────────────────────
+  //  Welcome-back carryover banner — added 8 September 2026.
+  //  `carriedOverFromDriverApp` is stamped server-side (onFoodDriverRegistered,
+  //  admin_panel/functions/food_driver_referral_carryover.js) the first time a
+  //  returning driver_app ("GoOuts Lead") driver registers here. It means we
+  //  found their existing /drivers record and copied over their verified KYC
+  //  evidence and/or their referral relationship, so they don't have to redo
+  //  either. Shown once per device, dismissible, per-uid so a shared/reset
+  //  device doesn't wrongly suppress it for a different driver.
+  // ─────────────────────────────────────────────────────────────────────
   Future<void> _load() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
     final doc = await _db.collection('food_drivers').doc(uid).get();
     if (!mounted) return;
-    setState(() => _driver = doc.data());
+    final data = doc.data();
+    final carriedOver = data?['carriedOverFromDriverApp'] == true;
+    bool dismissed = false;
+    if (carriedOver) {
+      dismissed = await _prefs.getBool(_welcomeBackDismissedKey(uid)) ?? false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _driver = data;
+      _showWelcomeBackBanner = carriedOver && !dismissed;
+    });
+  }
+
+  String _welcomeBackDismissedKey(String uid) => 'welcome_back_carryover_dismissed_$uid';
+
+  Future<void> _dismissWelcomeBackBanner() async {
+    final uid = _auth.currentUser?.uid;
+    setState(() => _showWelcomeBackBanner = false);
+    if (uid != null) {
+      await _prefs.setBool(_welcomeBackDismissedKey(uid), true);
+    }
   }
 
   Future<void> _signOut() async {
@@ -242,6 +275,55 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             ),
 
             const SizedBox(height: 14),
+
+            // ── Welcome back — driver_app (GoOuts Lead) carryover ───────
+            if (_showWelcomeBackBanner) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(color: Color(0xFFD1FAE5), shape: BoxShape.circle),
+                      child: const Icon(Icons.waving_hand_rounded, size: 18, color: Color(0xFF047857)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Welcome back!',
+                              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF065F46))),
+                          const SizedBox(height: 3),
+                          Text(
+                            (_driver?['referredBy'] as String?)?.isNotEmpty == true
+                                ? 'We found your GoOuts Lead account — your verified documents and referral carried over, so nothing to redo.'
+                                : 'We found your GoOuts Lead account — your verified documents carried over, so nothing to redo.',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF065F46), height: 1.35),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _dismissWelcomeBackBanner,
+                      child: const Padding(
+                        padding: EdgeInsets.only(left: 6, top: 2),
+                        child: Icon(Icons.close_rounded, size: 18, color: Color(0xFF047857)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
 
             // ── Light mode toggle — REAL, drives ThemeProvider ──────────
             Container(
