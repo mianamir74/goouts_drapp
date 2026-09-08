@@ -137,7 +137,17 @@ class _DappRegistrationScreenState extends State<DappRegistrationScreen> {
         'vehicleType':     ['bicycle', 'scooter', 'car'][_vehicleIdx],
         'profilePhotoUrl': photoUrl,
         'licenseUrl':      licenseUrl,
-        'referralCode':    _referralCtrl.text.trim(),
+        // ⚠ FIXED 8 September 2026 — this used to write ONLY 'referralCode',
+        // but food_driver_referral_carryover.js's onFoodDriverRegistered
+        // reads 'referralCodeUsed' to resolve who referred this driver.
+        // Every brand-new registration that typed a code here was silently
+        // never resolving it (only driver_app veterans with a legacy
+        // /drivers.referredBy already set were ever getting credited, via
+        // that trigger's fallback path). Writing both: 'referralCode' stays
+        // for whatever else may read it, 'referralCodeUsed' is the one the
+        // resolver actually needs.
+        'referralCode':     _referralCtrl.text.trim(),
+        'referralCodeUsed': _referralCtrl.text.trim(),
         'isOnline':        false,
         'status':          'pending_approval',
         'rating':          5.0,
