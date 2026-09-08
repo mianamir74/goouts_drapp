@@ -35,13 +35,19 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
     'assets/intro/Stay tuned_7.png',
   ];
 
+  // ⚠ FIXED 8 September 2026 — these used to point at assets/intro/business/,
+  // a folder that has never existed in this project (checked the old
+  // driver_app tree too — never there either). Every business partner who
+  // tapped "view intro" saw a "Missing intro asset" placeholder on every
+  // slide. Repointed at the same real driver images per Mian's decision —
+  // not business-specific copy, but real content instead of a broken screen.
   static const List<String> _businessPartnerSlides = <String>[
-    'assets/intro/business/Splash Logo_1.png',
-    'assets/intro/business/Become Partner_2a.png',
-    'assets/intro/business/Commission Structure_3a.png',
+    'assets/intro/Splash Logo_1.png',
+    'assets/intro/Become Partner_2.png',
+    'assets/intro/Commission Structure_3a.png',
     'assets/intro/Grow Network_4.png',
-    'assets/intro/business/More opportunities_6.png',
-    'assets/intro/business/Stay tuned_7.png',
+    'assets/intro/More opportunities_6.png',
+    'assets/intro/Stay tuned_7.png',
   ];
 
   final PageController _pageController = PageController();
