@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:auto_size_text/auto_size_text.dart';
-import '../../utils/kyc_status.dart';
+// Reuses goouts_drapp's own lib/utils/kyc_status.dart — confirmed byte-identical
+// to driver_app's copy at merge time (11 Sep 2026).
+import '../../../utils/kyc_status.dart';
 
 class BusinessProfileScreen extends StatefulWidget {
   const BusinessProfileScreen({super.key});
@@ -98,8 +100,8 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
       // Neither word is what an approval writes, and 'submitted' is the word
       // for NOT YET APPROVED:
       //
-      //   business_registration_screen.dart:869 .. writes 'submitted' the
-      //   registration_screen.dart:1466 ......... moment the form is sent
+      //   business_registration_screen.dart:843 .. writes 'submitted' the
+      //   registration_screen.dart:1601 ......... moment the form is sent
       //   business_model.dart:178 (default) ..... — reviewed by nobody
       //
       //   kyc_audit.js:160 ...................... writes 'approved' when an
@@ -284,9 +286,9 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
             ),
             child: Row(
               children: [
@@ -320,9 +322,9 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.14),
+                    color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
                   ),
                   child: Text(
                     _isVerified ? 'Verified' : 'Submitted',

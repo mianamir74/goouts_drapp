@@ -70,8 +70,8 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/logo/virtual_card.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "assets/logo/virtual_card.png"
-  adaptive_icon_foreground: "assets/logo/virtual_card.png"
+  adaptive_icon_background: "#1492C9"
+  adaptive_icon_foreground: "assets_icon/icon_foreground.png"
   min_sdk_android: 21
   web:
     generate: false

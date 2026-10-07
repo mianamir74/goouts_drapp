@@ -1,28 +1,40 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'auth_flow_guard.dart';
+import 'auth_service.dart';
+
 import '../home/business_home_screen.dart';
-import '../home/driver_home_screen.dart';
-import 'otp_verification_screen.dart';
-import 'referral_code_screen.dart';
 import 'business_referral_code_screen.dart';
+import 'otp_verification_screen.dart';
 import 'widgets/pre_auth_support_sheet.dart';
 import 'package:auto_size_text/auto_size_text.dart';
-import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+// ─────────────────────────────────────────────────────────────────────────────
+//  Adapted from driver_app/lib/features/auth/login_screen.dart's
+//  Lead-Partner branch, 11 September 2026, as part of the goouts_drapp /
+//  driver_app merge (design/PARTNER_ECOSYSTEM_ARCHITECTURE.md §4).
+//
+//  This screen is reached ONLY via the "Lead Partner" choice on
+//  goouts_drapp's role picker, so — unlike driver_app's original, which was
+//  a single shared screen for driver / Lead Partner / cab driver — the
+//  driver and cab-driver branches have been removed. A driver-role signup
+//  never routes through here; it stays entirely on goouts_drapp's existing
+//  DappOnboardingScreen → DappLoginScreen → DappOtpScreen →
+//  DappRegistrationScreen chain, unchanged.
+// ─────────────────────────────────────────────────────────────────────────────
+class LeadPartnerLoginScreen extends StatefulWidget {
+  const LeadPartnerLoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<LeadPartnerLoginScreen> createState() => _LeadPartnerLoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LeadPartnerLoginScreenState extends State<LeadPartnerLoginScreen> {
   static const Color _goOutsBlue = Color(0xFF0392CA);
 
   static const String _pendingAccountTypeKey = 'pending_account_type';
@@ -32,10 +44,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  String _selectedAccountType = 'driver';
   bool _hasReadRouteArgs = false;
   bool _isReturningUser = false;
   bool _obscurePassword = true;
+
+  final _authService = AuthService();
 
   // Simple country picker state
   String _selectedDialCode = '+44';
@@ -56,7 +69,11 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       if (user != null && mounted) {
-        await _navigateToHomeForExistingUser(user);
+        try {
+          await _navigateToHomeForExistingUser(user);
+        } catch (_) {
+          // Silently ignore — login screen remains visible, user can retry
+        }
       }
     });
   }
@@ -81,19 +98,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final Object? args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map<String, dynamic>) {
-      final String accountType = (args['accountType'] ?? 'driver')
-          .toString()
-          .trim()
-          .toLowerCase();
-
-      if (accountType == 'business') {
-        _selectedAccountType = 'business';
-      } else if (accountType == 'cab_driver') {
-        _selectedAccountType = 'cab_driver';
-      } else {
-        _selectedAccountType = 'driver';
-      }
-
       // Pre-fill mobile number if passed (e.g. after logout)
       final String mobile = (args['mobile'] ?? '').toString().trim();
       if (mobile.isNotEmpty) {
@@ -115,52 +119,55 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final String cleaned = value.trim().replaceAll(RegExp(r'\s+'), '');
 
-    if (cleaned.length != 11) {
-      return 'Mobile number must be 11 digits';
-    }
-
-    if (!RegExp(r'^07\d{9}$').hasMatch(cleaned)) {
-      return 'Enter a valid UK mobile number';
+    if (_selectedDialCode == '+44') {
+      if (!RegExp(r'^07\d{9}$').hasMatch(cleaned)) {
+        return 'Enter a valid UK mobile number (e.g. 07911123456)';
+      }
+    } else if (_selectedDialCode == '+353') {
+      if (!RegExp(r'^08\d{8}$').hasMatch(cleaned)) {
+        return 'Enter a valid Irish mobile number (e.g. 0851234567)';
+      }
+    } else {
+      if (cleaned.length < 7) {
+        return 'Enter a valid mobile number';
+      }
     }
 
     return null;
   }
 
-  String _toE164UkNumber(String localNumber) {
-    final String cleaned = localNumber.replaceAll(RegExp(r'\s+'), '');
+  String _toE164Number(String localNumber) {
+    final String cleaned = localNumber.replaceAll(RegExp(r'[\s\-()]'), '');
 
-    // If UK selected and number is UK format, convert 07xxxxxxxxx to +44xxxxxxxxx
-    if (_selectedDialCode == '+44' &&
-        cleaned.startsWith('07') &&
-        cleaned.length == 11) {
-      return '+44${cleaned.substring(1)}';
+    // Already in E.164 — return as-is
+    if (cleaned.startsWith('+')) return cleaned;
+
+    // UK: 07xxxxxxxxx (11 digits) → +447xxxxxxxxx
+    if (_selectedDialCode == '+44') {
+      if (cleaned.startsWith('07') && cleaned.length == 11) {
+        return '+44${cleaned.substring(1)}';
+      }
+      // UK number without leading 0: 7xxxxxxxxx (10 digits)
+      if (cleaned.startsWith('7') && cleaned.length == 10) {
+        return '+44$cleaned';
+      }
     }
 
-    // For other codes, just prepend selected dial code to digits
-    if (_selectedDialCode.isNotEmpty && !cleaned.startsWith('+')) {
-      final String digitsOnly =
-          cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+    // Ireland: 08xxxxxxxxx (10 digits) → +3538xxxxxxxxx (drop leading 0)
+    if (_selectedDialCode == '+353') {
+      if (cleaned.startsWith('0') && cleaned.length >= 9) {
+        return '+353${cleaned.substring(1)}';
+      }
+      return '+353$cleaned';
+    }
+
+    // Other dial codes — strip non-digits then prepend dial code
+    if (_selectedDialCode.isNotEmpty) {
+      final String digitsOnly = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
       return '$_selectedDialCode$digitsOnly';
     }
 
     return cleaned;
-  }
-
-  String _firebaseErrorMessage(FirebaseAuthException e) {
-    switch (e.code) {
-      case 'invalid-phone-number':
-        return 'The mobile number format is invalid.';
-      case 'too-many-requests':
-        return 'Too many requests. Please try again later.';
-      case 'quota-exceeded':
-        return 'SMS quota exceeded for this project. Please try again later.';
-      case 'captcha-check-failed':
-        return 'App verification failed. Please try again.';
-      case 'app-not-authorized':
-        return 'This app is not authorized to use Firebase Authentication.';
-      default:
-        return e.message ?? 'Something went wrong. Please try again.';
-    }
   }
 
   Future<void> _showErrorDialog(String title, String message) async {
@@ -187,27 +194,29 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _navigateToHomeForExistingUser(User user) async {
     final firestore = FirebaseFirestore.instance;
-    final results = await Future.wait([
-      firestore.collection('drivers').doc(user.uid).get(),
-      firestore.collection('cab_drivers').doc(user.uid).get(),
-      firestore.collection('businesses').doc(user.uid).get(),
-    ]);
+    final DocumentSnapshot<Map<String, dynamic>> leadPartnerDoc;
+    try {
+      leadPartnerDoc =
+          await firestore.collection('lead_partners').doc(user.uid).get();
+    } catch (e) {
+      if (!mounted) return;
+      await _showErrorDialog('Connection Error',
+          'Could not reach the server. Please check your connection and try again.\n\n$e');
+      return;
+    }
     if (!mounted) return;
-    final bool isDriver    = results[0].exists;
-    final bool isCabDriver = results[1].exists;
-    final bool isBusiness  = results[2].exists;
-    if (isBusiness) {
+
+    if (leadPartnerDoc.exists) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const BusinessHomeScreen()),
         (route) => false,
       );
-    } else if (isDriver || isCabDriver) {
+    } else {
+      // New user — no Lead Partner profile exists yet. Send to registration.
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
+        MaterialPageRoute(builder: (_) => const BusinessReferralCodeScreen()),
         (route) => false,
       );
-    } else {
-      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
@@ -220,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).unfocus();
 
     final String localMobile = _mobileController.text.trim();
-    final String e164 = _toE164UkNumber(localMobile);
+    final String e164 = _toE164Number(localMobile);
     final String emailForAuth =
         '${e164.replaceAll('+', '').replaceAll(' ', '')}@goouts.app';
 
@@ -233,9 +242,10 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      // Mirror the OTP flow — save account type so main.dart routes correctly
+      // Mirror the OTP flow — save account type so app-level routing (if it
+      // ever needs it) sees the same value the OTP path writes.
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_pendingAccountTypeKey, _selectedAccountType);
+      await prefs.setString(_pendingAccountTypeKey, 'business');
 
       if (!mounted) return;
 
@@ -243,7 +253,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (user != null) {
         await _navigateToHomeForExistingUser(user);
       } else {
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Credential returned no user — unexpected. Show error instead of
+        // crashing to splash.
+        if (!mounted) return;
+        await _showErrorDialog('Login Failed', 'Could not retrieve your account. Please try OTP login.');
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -278,133 +291,98 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _handleContinue() async {
-    if (_isLoading) {
-      return;
+  Future<void> _completeVerificationFlow() async {
+    // Everything below can exit early (unmounted widget, no signed-in user),
+    // throw (prefs / Firestore failure), or complete normally. Whichever
+    // happens, AuthFlowGuard.end() below in `finally` guarantees the guard
+    // started in _handleContinue() is always released — otherwise the root
+    // app gate is stuck on its spinner for the rest of this app process.
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pendingAccountTypeKey, 'business');
+
+      if (!mounted) return;
+
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final FirebaseFirestore firestore = FirebaseFirestore.instance;
+      final DocumentSnapshot<Map<String, dynamic>> leadPartnerDoc =
+          await firestore.collection('lead_partners').doc(user.uid).get();
+
+      if (!mounted) return;
+
+      // Release the guard just before navigation so the app gate doesn't
+      // interfere while we pushAndRemoveUntil.
+      AuthFlowGuard.end();
+
+      if (leadPartnerDoc.exists) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const BusinessHomeScreen()),
+          (route) => false,
+        );
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const BusinessReferralCodeScreen()),
+          (route) => false,
+        );
+      }
+    } finally {
+      // Safety net for every early-return / exception path above. On the
+      // normal success path AuthFlowGuard.end() was already called just
+      // before navigation; calling it again here is a harmless no-op
+      // (AuthFlowGuard.end() is idempotent).
+      AuthFlowGuard.end();
     }
+  }
+
+  Future<void> _handleContinue() async {
+    if (_isLoading) return;
 
     final FormState? form = _formKey.currentState;
-    if (form == null || !form.validate()) {
-      return;
-    }
+    if (form == null || !form.validate()) return;
 
     FocusScope.of(context).unfocus();
 
     final String localMobile = _mobileController.text.trim();
-    final String e164PhoneNumber = _toE164UkNumber(localMobile);
+    final String e164PhoneNumber = _toE164Number(localMobile);
 
-    setState(() {
-      _isLoading = true;
-    });
+    // Cancel auth subscription and activate flow guard BEFORE any Firebase
+    // activity. The guard prevents the app gate's StreamBuilder from
+    // swapping widgets mid-flow (the same OTP/splash race driver_app fixed).
+    _authSubscription?.cancel();
+    _authSubscription = null;
+    AuthFlowGuard.start();
 
-    try {
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: e164PhoneNumber,
-        timeout: const Duration(seconds: 60),
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          try {
-            await FirebaseAuth.instance.signInWithCredential(credential);
+    setState(() => _isLoading = true);
 
-            if (!mounted) {
-              return;
-            }
-
-            GoOutsSheet.success(context, title: 'Verified', message: 'Phone number verified successfully.');
-          } on FirebaseAuthException catch (e) {
-            if (!mounted) {
-              return;
-            }
-
-            await _showErrorDialog(
-              'Verification Failed',
-              _firebaseErrorMessage(e),
-            );
-          } finally {
-            if (!mounted) {
-              return;
-            }
-
-            setState(() {
-              _isLoading = false;
-            });
-          }
-        },
-        verificationFailed: (FirebaseAuthException e) async {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            _isLoading = false;
-          });
-
-          await _showErrorDialog(
-            'OTP Failed',
-            _firebaseErrorMessage(e),
-          );
-        },
-        codeSent: (String verificationId, int? resendToken) async {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            _isLoading = false;
-          });
-
-          await Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              settings: RouteSettings(
-                arguments: <String, dynamic>{
-                  'accountType': _selectedAccountType,
-                },
-              ),
-              builder: (_) => OtpVerificationScreen(
-                verificationId: verificationId,
-                phoneNumber: e164PhoneNumber,
-                localMobileNumber: localMobile,
-                resendToken: resendToken,
-              ),
+    await _authService.sendOtp(
+      phoneNumber: e164PhoneNumber,
+      onCodeSent: (String verificationId, int? resendToken) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => LeadPartnerOtpVerificationScreen(
+              verificationId: verificationId,
+              phoneNumber: e164PhoneNumber,
+              localMobileNumber: localMobile,
+              resendToken: resendToken,
             ),
-          );
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            _isLoading = false;
-          });
-        },
-      );
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      await _showErrorDialog(
-        'OTP Failed',
-        _firebaseErrorMessage(e),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      await _showErrorDialog(
-        'Error',
-        'Failed to start phone verification.\n\n$e',
-      );
-    }
+          ),
+        );
+      },
+      onAutoVerified: () async {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        await _completeVerificationFlow();
+      },
+      onError: (String message) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        if (context.mounted) _showErrorDialog('OTP Failed', message);
+      },
+    );
   }
 
   InputDecoration _inputDecoration(String label) {
@@ -439,14 +417,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  String _accountTypeHelperText() {
-    if (_selectedAccountType == 'business') {
-      return 'Business Partner login';
-    }
-
-    return 'Driver login';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -470,11 +440,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           Image.asset(
-                            'assets/logo/goouts_logo_login.png',
+                            'assets/logo/role_icon.png',
                             height: 190,
                             fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.storefront_rounded,
+                              size: 90,
+                              color: _goOutsBlue,
+                            ),
                           ),
-                          SizedBox(height: 20),
+                          const SizedBox(height: 20),
                           AutoSizeText(
                             _isReturningUser
                                 ? 'Welcome Back!'
@@ -486,7 +461,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.black87,
                             ),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           AutoSizeText(
                             _isReturningUser
                                 ? 'Enter your password to sign back in'
@@ -499,11 +474,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          SizedBox(height: 10),
-                          AutoSizeText(
-                            _accountTypeHelperText(),
+                          const SizedBox(height: 10),
+                          const AutoSizeText(
+                            'Lead Partner login',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               color: _goOutsBlue,
                               height: 1.45,
@@ -612,13 +587,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                           FilteringTextInputFormatter
                                               .digitsOnly,
                                           LengthLimitingTextInputFormatter(
-                                            11,
+                                            _selectedDialCode == '+353' ? 10 : 11,
                                           ),
                                         ],
                                         decoration: _inputDecoration(
                                           'Mobile Number',
                                         ).copyWith(
-                                          hintText: '07123456780',
+                                          hintText: _selectedDialCode == '+353' ? '0851234567' : '07123456780',
                                           counterText: '',
                                         ),
                                         validator: _mobileValidator,
@@ -675,7 +650,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         tapTargetSize:
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      child: AutoSizeText(
+                                      child: const AutoSizeText(
                                         'Forgot PIN?',
                                         style: TextStyle(
                                           fontSize: 13,
@@ -685,7 +660,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                   ),
                                 ],
-                                SizedBox(height: 24),
+                                const SizedBox(height: 24),
                                 SizedBox(
                                   width: double.infinity,
                                   height: 54,
@@ -705,7 +680,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     ),
                                     child: _isLoading
-                                        ? SizedBox(
+                                        ? const SizedBox(
                                             height: 22,
                                             width: 22,
                                             child:
@@ -714,7 +689,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                               color: Colors.white,
                                             ),
                                           )
-                                        : AutoSizeText(
+                                        : const AutoSizeText(
                                             'Continue',
                                             style: TextStyle(
                                               fontSize: 16,
@@ -726,9 +701,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                           ),
-                          SizedBox(height: 22),
+                          const SizedBox(height: 22),
                           if (!_isReturningUser)
-                          AutoSizeText(
+                          const AutoSizeText(
                             'You will receive a one-time verification code by SMS.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -737,6 +712,24 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
+                          Center(
+                            child: GestureDetector(
+                              onTap: () => showPreAuthSupportSheet(
+                                context,
+                                accountType: 'business',
+                              ),
+                              child: const Text(
+                                'Having trouble? Get help',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black38,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Colors.black26,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                         ],
                       ),
                     ),

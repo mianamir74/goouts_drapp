@@ -1,303 +1,276 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
-class WeeklyResidualSummaryScreen extends StatefulWidget {
-  const WeeklyResidualSummaryScreen({super.key});
-
-  @override
-  State<WeeklyResidualSummaryScreen> createState() =>
-      _WeeklyResidualSummaryScreenState();
+// ─────────────────────────────────────────────────────────────────────────────
+//  Rewired 9 September 2026. Every number on this screen used to be hardcoded
+//  Stitch-mockup filler (£482.50, "+12%", "42 active referrals", a 7-day bar
+//  chart, and a "Top Performers" leaderboard naming two people —
+//  "Marcus Thompson" and "Golden Fork Bistro" — who do not exist). That was
+//  fine as a UI-build placeholder, but this screen is reachable from a real
+//  driver's earnings tab, so it must show that driver's real numbers now.
+//
+//  This screen no longer fetches anything itself — earnings_screen.dart
+//  already loads exactly this data (food_drivers/{uid} plus the
+//  driverReferrals/merchantReferrals subcollections) for its own Residual
+//  Income tab, so the caller passes it straight through. That avoids a
+//  second, possibly-inconsistent Firestore read for the same numbers a
+//  driver just saw on the screen before this one.
+//
+//  REMOVED, not faked with a "coming soon" placeholder either:
+//    - The Weekly/Monthly toggle and "+12%" trend — there is no per-period
+//      residual history anywhere in the schema, only running totals
+//      (residualTotal, driverResidualEarned, merchantResidualEarned,
+//      pendingPayout on food_drivers/{uid}). A trend needs two points in
+//      time; only one exists.
+//    - The 7-day "Residual Growth" bar chart — same reason.
+//    - "Top Performers" — even once real, this would mean showing one
+//      driver another driver's or merchant's earnings, which is someone
+//      else's financial data. Replaced with THIS driver's own referral
+//      list, which is the real equivalent of what that section was trying
+//      to show.
+// ─────────────────────────────────────────────────────────────────────────────
+class _C {
+  static const bg        = Color(0xFFF2F4F7);
+  static const surface   = Color(0xFFFFFFFF);
+  static const primary   = Color(0xFF0392CA);
+  static const primaryDk = Color(0xFF006488);
+  static const navy      = Color(0xFF0D1B3E);
+  static const accent    = Color(0xFFF97316);
+  static const paleTint  = Color(0xFFE0F3FB);
+  static const body      = Color(0xFF475569);
+  static const muted     = Color(0xFF94A3B8);
+  static const success   = Color(0xFF16A34A);
+  static const successBg = Color(0xFFDCFCE7);
+  static const border    = Color(0xFFE2E8F0);
 }
 
-class _WeeklyResidualSummaryScreenState
-    extends State<WeeklyResidualSummaryScreen> {
-  int _toggleIdx = 0; // 0=Weekly, 1=Monthly
+class WeeklyResidualSummaryScreen extends StatelessWidget {
+  const WeeklyResidualSummaryScreen({
+    super.key,
+    required this.residualTotal,
+    required this.pendingPayout,
+    required this.driverReferralCount,
+    required this.merchantReferralCount,
+    required this.driverResidualEarned,
+    required this.merchantResidualEarned,
+    required this.driverRefs,
+    required this.merchantRefs,
+  });
+
+  final double residualTotal;
+  final double pendingPayout;
+  final int driverReferralCount;
+  final int merchantReferralCount;
+  final double driverResidualEarned;
+  final double merchantResidualEarned;
+  final List<Map<String, dynamic>> driverRefs;
+  final List<Map<String, dynamic>> merchantRefs;
+
+  void _onShare() {
+    final totalReferrals = driverReferralCount + merchantReferralCount;
+    final buffer = StringBuffer()
+      ..writeln('My GoOuts residual income')
+      ..writeln('Total earned: £${residualTotal.toStringAsFixed(2)}')
+      ..writeln('From $totalReferrals referral${totalReferrals == 1 ? '' : 's'} '
+          '($driverReferralCount driver${driverReferralCount == 1 ? '' : 's'}, '
+          '$merchantReferralCount merchant${merchantReferralCount == 1 ? '' : 's'})');
+    SharePlus.instance.share(ShareParams(text: buffer.toString()));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final totalReferrals = driverReferralCount + merchantReferralCount;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF031134),
+      backgroundColor: _C.bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: _C.surface,
+        elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: _C.navy),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('Residual Summary',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+            style: TextStyle(
+                color: _C.navy, fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
-
-            // ── Weekly / Monthly toggle ───────────────────────────────
-            Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF0b1a3d),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  _toggleItem('Weekly', 0),
-                  _toggleItem('Monthly', 1),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Reporting period ─────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Reporting Period',
-                        style: TextStyle(
-                            color: Colors.white54, fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text(
-                      _toggleIdx == 0
-                          ? 'Oct 16 – Oct 22, 2023'
-                          : 'October 2023',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: Colors.white),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0b1a3d),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.calendar_today,
-                      size: 20, color: Color(0xFF0392ca)),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Total residual earned card ────────────────────────────
+            // ── Total residual earned ─────────────────────────────────
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0b1a3d), Color(0xFF031134)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border:
-                    Border.all(color: Colors.white.withOpacity(0.05)),
+                color: _C.surface,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2)),
+                ],
               ),
-              child: Stack(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Icon(Icons.payments,
-                        size: 80,
-                        color: Colors.white.withOpacity(0.05)),
+                  const Text('TOTAL RESIDUAL EARNED',
+                      style: TextStyle(
+                          color: _C.muted,
+                          fontSize: 11,
+                          letterSpacing: 0.8,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 10),
+                  Text('£${residualTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          color: _C.navy,
+                          letterSpacing: -1)),
+                  const SizedBox(height: 8),
+                  Text(
+                    totalReferrals == 0
+                        ? 'No referrals yet.'
+                        : 'Calculated from $totalReferrals referral${totalReferrals == 1 ? '' : 's'}.',
+                    style: const TextStyle(color: _C.body, fontSize: 12.5),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Total Residual Earned',
-                          style: TextStyle(
-                              color: Colors.white54, fontSize: 14)),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text('£482.50',
-                              style: TextStyle(
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white)),
-                          const SizedBox(width: 12),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Row(
-                              children: const [
-                                Icon(Icons.trending_up,
-                                    color: Color(0xFF10b981), size: 16),
-                                SizedBox(width: 4),
-                                Text('+12%',
-                                    style: TextStyle(
-                                        color: Color(0xFF10b981),
-                                        fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Calculated from 42 active referrals',
-                        style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic),
-                      ),
-                    ],
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _C.bg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Pending payout',
+                            style: TextStyle(
+                                color: _C.body,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700)),
+                        Text('£${pendingPayout.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                color: _C.success,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800)),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // ── Referral breakdown grid ───────────────────────────────
+            // ── Referral breakdown ────────────────────────────────────
             Row(
               children: [
                 Expanded(
                   child: _referralCard(
                     'Driver Referrals',
-                    '28 Active',
-                    '£310.20',
-                    const Color(0xFF0392ca),
+                    '$driverReferralCount Referred',
+                    '£${driverResidualEarned.toStringAsFixed(2)}',
+                    _C.primary,
                     Icons.local_shipping,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: _referralCard(
                     'Merchant Referrals',
-                    '14 Active',
-                    '£172.30',
-                    const Color(0xFFf97316),
+                    '$merchantReferralCount Referred',
+                    '£${merchantResidualEarned.toStringAsFixed(2)}',
+                    _C.accent,
                     Icons.storefront,
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 20),
 
-            // ── Residual growth chart ─────────────────────────────────
-            const Text('Residual Growth',
-                style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold,
-                    color: Colors.white)),
-            const SizedBox(height: 16),
+            // ── Honest note replacing the fake growth chart ──────────
             Container(
-              height: 200,
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF0b1a3d),
-                borderRadius: BorderRadius.circular(20),
+                color: _C.paleTint,
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Column(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text('Earnings Trend',
-                          style: TextStyle(
-                              color: Colors.white54, fontSize: 12)),
-                      Text('7 Day Trend',
-                          style: TextStyle(
-                              color: Colors.white30, fontSize: 10)),
-                    ],
-                  ),
-                  const Spacer(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _bar(40, 'M'),
-                      _bar(60, 'T'),
-                      _bar(55, 'W'),
-                      _bar(80, 'T'),
-                      _bar(45, 'F'),
-                      _bar(90, 'S'),
-                      _bar(100, 'S', active: true),
-                    ],
+                  const Icon(Icons.info_outline_rounded,
+                      size: 16, color: _C.primaryDk),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Day-by-day residual history isn\'t tracked yet — the '
+                      'totals above are accurate as of right now.',
+                      style: TextStyle(
+                          fontSize: 12, color: _C.body, height: 1.35),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
-            // ── Top performers ────────────────────────────────────────
-            const Text('Top Performers',
+            // ── Your referrals — real people, not a fake leaderboard ─
+            const Text('Your Driver Referrals',
                 style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold,
-                    color: Colors.white)),
-            const SizedBox(height: 16),
-            _performerItem('1', 'Marcus Thompson',
-                'Fleet Leader (12 referrals)', '£84.20', 'Earnings Hub'),
-            _performerItem('2', 'Golden Fork Bistro',
-                'Merchant Partner', '£62.15', 'Commission'),
+                    fontSize: 16, fontWeight: FontWeight.bold, color: _C.navy)),
+            const SizedBox(height: 10),
+            if (driverRefs.isEmpty)
+              _emptyState('No driver referrals yet.')
+            else
+              ...driverRefs.map((r) => _referralItem(
+                    name: (r['name'] as String?) ?? 'Driver',
+                    amount: '+£${((r['earned'] as num?) ?? 0).toStringAsFixed(2)}',
+                  )),
+
+            const SizedBox(height: 20),
+
+            const Text('Your Merchant Referrals',
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold, color: _C.navy)),
+            const SizedBox(height: 10),
+            if (merchantRefs.isEmpty)
+              _emptyState('No merchant referrals yet.')
+            else
+              ...merchantRefs.map((r) => _referralItem(
+                    name: (r['name'] as String?) ?? 'Merchant',
+                    amount: '+£${((r['earned'] as num?) ?? 0).toStringAsFixed(2)}',
+                    isShop: true,
+                  )),
 
             const SizedBox(height: 24),
 
             // ── Share button ──────────────────────────────────────────
             SizedBox(
               width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () {},
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _onShare,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFf97316),
+                  backgroundColor: _C.accent,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                      borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.share_outlined),
-                    SizedBox(width: 12),
-                    Text('Share Summary',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
-                ),
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: const Text('Share Summary',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 24),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _toggleItem(String label, int idx) {
-    final sel = _toggleIdx == idx;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _toggleIdx = idx),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: sel ? const Color(0xFF0392ca) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: sel ? Colors.white : Colors.white54,
-              fontWeight:
-                  sel ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
         ),
       ),
     );
@@ -306,10 +279,10 @@ class _WeeklyResidualSummaryScreenState
   Widget _referralCard(String title, String subtitle, String amount,
       Color color, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0b1a3d),
-        borderRadius: BorderRadius.circular(20),
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Column(
@@ -321,129 +294,81 @@ class _WeeklyResidualSummaryScreenState
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(title,
               style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white)),
-          const SizedBox(height: 4),
-          Text(subtitle,
-              style: const TextStyle(
-                  color: Colors.white38, fontSize: 11)),
-          const SizedBox(height: 12),
+                  fontSize: 12.5, fontWeight: FontWeight.bold, color: _C.navy)),
+          const SizedBox(height: 2),
+          Text(subtitle, style: const TextStyle(color: _C.muted, fontSize: 11)),
+          const SizedBox(height: 10),
           Text(amount,
               style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: color)),
+                  fontSize: 19, fontWeight: FontWeight.w900, color: color)),
         ],
       ),
     );
   }
 
-  Widget _bar(double height, String label, {bool active = false}) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Container(
-          height: height,
-          width: 24,
-          decoration: BoxDecoration(
-            color: active
-                ? const Color(0xFF0392ca)
-                : const Color(0xFF031134),
-            borderRadius: BorderRadius.circular(6),
-            border: active
-                ? null
-                : Border.all(
-                    color: Colors.white.withOpacity(0.05)),
-          ),
+  Widget _emptyState(String text) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(14),
         ),
-        const SizedBox(height: 8),
-        Text(label,
-            style: TextStyle(
-                color: active ? Colors.white : Colors.white24,
-                fontSize: 10)),
-      ],
-    );
-  }
+        child: Row(children: [
+          const Icon(Icons.info_outline, color: _C.muted, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(text,
+                  style: const TextStyle(color: _C.muted, fontSize: 13))),
+        ]),
+      );
 
-  Widget _performerItem(String rank, String name, String subtitle,
-      String amount, String label) {
+  Widget _referralItem({
+    required String name,
+    required String amount,
+    bool isShop = false,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0b1a3d),
-        borderRadius: BorderRadius.circular(16),
+        color: _C.surface,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
       ),
       child: Row(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFF031134),
-                child: Text(
-                  name[0],
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
-              Positioned(
-                top: -5,
-                left: -5,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFf97316),
-                    shape: BoxShape.circle,
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: isShop
+                ? _C.paleTint
+                : _C.primary.withOpacity(0.15),
+            child: isShop
+                ? const Icon(Icons.storefront, color: _C.primaryDk, size: 18)
+                : Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                        color: _C.primary, fontWeight: FontWeight.bold),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(rank,
-                      style: const TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white)),
-                ),
-              ),
-            ],
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.white)),
-                Text(subtitle,
-                    style: const TextStyle(
-                        color: Colors.white38, fontSize: 11)),
-              ],
-            ),
+            child: Text(name,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 14, color: _C.navy)),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(amount,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.white)),
-              Text(label,
-                  style: const TextStyle(
-                      color: Color(0xFF10b981), fontSize: 10)),
-            ],
-          ),
+          Text(amount,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 15, color: _C.success)),
         ],
       ),
     );

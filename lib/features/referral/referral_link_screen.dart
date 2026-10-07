@@ -369,7 +369,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
 
     if (isBusiness) {
       return "Hi $safeName,\n\n"
-          "I'm a Business Partner with GoOuts and I'd like to invite you to join as a food delivery driver.\n\n"
+          "I'm a Lead Partner with GoOuts and I'd like to invite you to join as a food delivery driver.\n\n"
           "GoOuts is expanding and looking for drivers who want flexible delivery work with a simple onboarding process.\n\n"
           "You can also earn additional income by inviting other drivers once you join.\n\n"
           "Please download the GoOuts Driver Registration app and enter this referral code during registration:\n\n"
@@ -410,7 +410,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
 
     if (isBusiness) {
       return "Hi $safeName,\n\n"
-          "I'm a Business Partner with GoOuts and I'd like to invite you to join as a food delivery driver.\n\n"
+          "I'm a Lead Partner with GoOuts and I'd like to invite you to join as a food delivery driver.\n\n"
           "GoOuts is expanding and looking for drivers who want flexible delivery work with a simple onboarding process.\n\n"
           "You can also earn additional income by inviting other drivers once you join.\n\n"
           "Please download the GoOuts Driver Registration app and enter this referral code during registration:\n\n"
@@ -492,7 +492,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
   }) async {
     final FirebaseFirestore firestore = FirebaseFirestore.instance;
     final String ownerAccountType = switch (ownerCollection) {
-      'businesses' => 'business',
+      'lead_partners' => 'business',
       'cab_drivers' => 'cab_driver',
       'food_drivers' => 'food_driver',
       _ => 'driver',
@@ -987,7 +987,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
 
   Future<Map<String, dynamic>?> _loadBusinessData(String uid) async {
     final DocumentSnapshot<Map<String, dynamic>> snapshot =
-        await FirebaseFirestore.instance.collection('businesses').doc(uid).get();
+        await FirebaseFirestore.instance.collection('lead_partners').doc(uid).get();
     return snapshot.data();
   }
 
@@ -1287,7 +1287,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
               _ensureOwnReferralCode(
                 uid: currentUser.uid,
                 existingCode: referralCode,
-                collection: 'businesses',
+                collection: 'lead_partners',
                 isBusiness: true,
               );
 
@@ -1299,7 +1299,7 @@ class _ReferralLinkScreenState extends State<ReferralLinkScreen> {
             return _buildReferralContent(
               currentUser: currentUser,
               referralCode: referralCode,
-              ownerCollection: 'businesses',
+              ownerCollection: 'lead_partners',
               isBusiness: true,
             );
           }

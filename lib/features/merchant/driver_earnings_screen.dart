@@ -75,7 +75,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       if (uid == null) return;
 
       final snap = await FirebaseFirestore.instance
-          .collection('businesses')
+          .collection('lead_partners')
           .where('referredBy', isEqualTo: uid)
           .orderBy('submittedAt', descending: true)
           .get();
@@ -101,7 +101,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
         final docId = m['docId'] as String;
         try {
           final commSnap = await FirebaseFirestore.instance
-              .collection('businesses')
+              .collection('lead_partners')
               .doc(docId)
               .collection('driver_commissions')
               .get();

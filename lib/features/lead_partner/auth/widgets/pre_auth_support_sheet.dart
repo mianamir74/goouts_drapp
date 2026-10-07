@@ -58,7 +58,7 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
 
   String get _sourceCollection {
     switch (widget.accountType) {
-      case 'business':   return 'businesses';
+      case 'business':   return 'lead_partners';
       case 'cab_driver': return 'cab_drivers';
       default:           return 'drivers';
     }
@@ -242,7 +242,7 @@ class _PreAuthSupportSheetState extends State<_PreAuthSupportSheet> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: sel ? _blue.withOpacity(0.08) : _bg,
+                    color: sel ? _blue.withValues(alpha: 0.08) : _bg,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                         color: sel ? _blue : _border,

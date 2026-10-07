@@ -186,7 +186,7 @@ class DriverFcmService {
   //  RETURNED WITHOUT SAVING ANYTHING — a real food delivery driver's FCM
   //  token was never written anywhere, silently, for every install.
   //
-  //  Same shape as the /businesses-vs-/stay_hosts confusion found in the Host
+  //  Same shape as the /lead_partners-vs-/stay_hosts confusion found in the Host
   //  app on 8 August: code copied from driver_app ("GoOuts Lead") carrying
   //  driver_app's collection names into an app with a different identity
   //  model. food_drivers checked first and is expected to be the only hit;
@@ -208,7 +208,7 @@ class DriverFcmService {
       await _firestore.collection('food_drivers').doc(user.uid).get();
 
   final DocumentSnapshot<Map<String, dynamic>> businessDoc =
-      await _firestore.collection('businesses').doc(user.uid).get();
+      await _firestore.collection('lead_partners').doc(user.uid).get();
 
   final DocumentSnapshot<Map<String, dynamic>> driverDoc =
       await _firestore.collection('drivers').doc(user.uid).get();
@@ -221,7 +221,7 @@ class DriverFcmService {
   if (foodDriverDoc.exists) {
     targetCollection = 'food_drivers';
   } else if (businessDoc.exists) {
-    targetCollection = 'businesses';
+    targetCollection = 'lead_partners';
   } else if (driverDoc.exists) {
     targetCollection = 'drivers';
   } else if (cabDriverDoc.exists) {

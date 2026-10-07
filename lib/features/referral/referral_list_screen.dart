@@ -17,11 +17,11 @@ import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 Future<String> _resolveDriverCollection(String uid) async {
   final firestore = FirebaseFirestore.instance;
   final results = await Future.wait([
-    firestore.collection('businesses').doc(uid).get(),
+    firestore.collection('lead_partners').doc(uid).get(),
     firestore.collection('cab_drivers').doc(uid).get(),
     firestore.collection('food_drivers').doc(uid).get(),
   ]);
-  if (results[0].exists) return 'businesses';
+  if (results[0].exists) return 'lead_partners';
   if (results[1].exists) return 'cab_drivers';
   if (results[2].exists) return 'food_drivers';
   return 'drivers';

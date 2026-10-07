@@ -1,20 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../home/business_home_screen.dart';
-import '../home/driver_home_screen.dart';
+import 'auth_flow_guard.dart';
+import 'business_referral_code_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
-class OtpVerificationScreen extends StatefulWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+//  Adapted from driver_app/lib/features/auth/otp_verification_screen.dart,
+//  11 September 2026, as part of the goouts_drapp / driver_app merge
+//  (design/PARTNER_ECOSYSTEM_ARCHITECTURE.md §4). Driver / cab-driver
+//  branches removed — this screen only ever follows LeadPartnerLoginScreen,
+//  so it only checks the 'lead_partners' collection.
+// ─────────────────────────────────────────────────────────────────────────────
+class LeadPartnerOtpVerificationScreen extends StatefulWidget {
   final String verificationId;
   final String phoneNumber;
   final String localMobileNumber;
   final int? resendToken;
 
-  const OtpVerificationScreen({
+  const LeadPartnerOtpVerificationScreen({
     super.key,
     required this.verificationId,
     required this.phoneNumber,
@@ -23,10 +32,12 @@ class OtpVerificationScreen extends StatefulWidget {
   });
 
   @override
-  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  State<LeadPartnerOtpVerificationScreen> createState() =>
+      _LeadPartnerOtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
+class _LeadPartnerOtpVerificationScreenState
+    extends State<LeadPartnerOtpVerificationScreen> {
   static const Color _goOutsBlue = Color(0xFF0392CA);
   static const String _pendingAccountTypeKey = 'pending_account_type';
 
@@ -37,41 +48,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   int? _resendToken;
   bool _isVerifying = false;
   bool _isResending = false;
-  bool _hasReadRouteArgs = false;
-  String _accountType = 'driver';
+  bool _hasNavigated = false; // guard against double navigation (verificationCompleted + manual OTP race)
 
   @override
   void initState() {
     super.initState();
     _verificationId = widget.verificationId;
     _resendToken = widget.resendToken;
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_hasReadRouteArgs) {
-      return;
-    }
-
-    _hasReadRouteArgs = true;
-
-    final Object? args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map<String, dynamic>) {
-      final String accountType = (args['accountType'] ?? 'driver')
-          .toString()
-          .trim()
-          .toLowerCase();
-
-      if (accountType == 'business') {
-        _accountType = 'business';
-      } else if (accountType == 'cab_driver') {
-        _accountType = 'cab_driver';
-      } else {
-        _accountType = 'driver';
-      }
-    }
   }
 
   @override
@@ -135,56 +118,83 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   Future<void> _savePendingAccountType() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_pendingAccountTypeKey, _accountType);
+    await prefs.setString(_pendingAccountTypeKey, 'business');
   }
 
-  String _accountTypeText() {
-    return _accountType == 'business'
-        ? 'Business Partner'
-        : 'Driver';
+  // Breadcrumbs — written to Crashlytics so a failed verification can be
+  // traced to the exact step afterwards.
+  void _bc(String step) {
+    FirebaseCrashlytics.instance.log('LEAD-PARTNER-OTP-VERIFY: $step');
   }
 
   Future<void> _completeSuccessfulVerification() async {
-    await _savePendingAccountType();
+    // Guard against double navigation (verificationCompleted firing after codeSent on Android).
+    // If we've already run once for this attempt, that earlier run's own
+    // try/finally below already released AuthFlowGuard — nothing left to do.
+    if (_hasNavigated) return;
+    _hasNavigated = true;
 
-    if (!mounted) return;
+    // Everything below can exit early (unmounted widget, no signed-in user),
+    // throw or time out (the Firestore lead_partners lookup), or complete
+    // normally. Whichever happens, AuthFlowGuard.end() below in `finally`
+    // guarantees the guard started in LeadPartnerLoginScreen._handleContinue()
+    // is always released — otherwise the root app gate is stuck on its
+    // spinner for the rest of this app process even though sign-in succeeded.
+    try {
+      _bc('completeVerification: start');
+      await _savePendingAccountType();
+      _bc('completeVerification: saved pending account type');
 
-    final User? user = FirebaseAuth.instance.currentUser;
+      if (!mounted) return;
 
-    if (user == null) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      return;
-    }
+      final User? user = FirebaseAuth.instance.currentUser;
+      _bc('completeVerification: currentUser=${user?.uid ?? "null"}');
 
-    // Check if this is an existing user (forgot password / re-login)
-    // or a brand new signup that still needs registration.
-    final FirebaseFirestore firestore = FirebaseFirestore.instance;
-    final List<DocumentSnapshot<Map<String, dynamic>>> results =
-        await Future.wait([
-      firestore.collection('drivers').doc(user.uid).get(),
-      firestore.collection('cab_drivers').doc(user.uid).get(),
-      firestore.collection('businesses').doc(user.uid).get(),
-    ]);
+      if (user == null) {
+        // Sign-in completed but no user returned — release guard and pop to root
+        AuthFlowGuard.end();
+        if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
 
-    if (!mounted) return;
+      _bc('completeVerification: querying lead_partners');
+      final DocumentSnapshot<Map<String, dynamic>> businessResult =
+          await FirebaseFirestore.instance
+              .collection('lead_partners')
+              .doc(user.uid)
+              .get()
+              .timeout(const Duration(seconds: 6));
+      _bc('completeVerification: firestore lookup done');
 
-    final bool isDriver    = results[0].exists;
-    final bool isCabDriver = results[1].exists;
-    final bool isBusiness  = results[2].exists;
+      final bool isBusiness = businessResult.exists;
 
-    if (isBusiness) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const BusinessHomeScreen()),
-        (route) => false,
-      );
-    } else if (isDriver || isCabDriver) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
-        (route) => false,
-      );
-    } else {
-      // New user — pop to root so AuthProfileGate handles registration routing
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!mounted) return;
+
+      // Release guard just before navigation.
+      AuthFlowGuard.end();
+
+      if (isBusiness) {
+        _bc('completeVerification: navigating to BusinessHomeScreen');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const BusinessHomeScreen()),
+          (route) => false,
+        );
+      } else {
+        // New user — send to Lead Partner registration.
+        _bc('completeVerification: navigating to BusinessReferralCodeScreen');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const BusinessReferralCodeScreen()),
+          (route) => false,
+        );
+      }
+      _bc('completeVerification: navigation call returned');
+    } finally {
+      // Safety net for every early-return / exception / timeout path above.
+      // On both success sub-paths AuthFlowGuard.end() was already called
+      // above; calling it again here is a harmless no-op (AuthFlowGuard.end()
+      // is idempotent).
+      AuthFlowGuard.end();
     }
   }
 
@@ -198,12 +208,21 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     try {
+      _bc('verifyOtp: building credential');
       final PhoneAuthCredential credential = PhoneAuthProvider.credential(
         verificationId: _verificationId,
         smsCode: _otpController.text.trim(),
       );
 
-      await FirebaseAuth.instance.signInWithCredential(credential);
+      _bc('verifyOtp: calling signInWithCredential');
+      // Timeout added as a safety net — if Firebase's native handshake here
+      // hangs/spins instead of returning cleanly, this at least stops OUR
+      // code from waiting forever and surfaces a catchable error instead of
+      // the app going blank and dying.
+      await FirebaseAuth.instance
+          .signInWithCredential(credential)
+          .timeout(const Duration(seconds: 8));
+      _bc('verifyOtp: signInWithCredential returned successfully');
 
       await _completeSuccessfulVerification();
     } on FirebaseAuthException catch (e) {
@@ -225,13 +244,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         'Failed to verify OTP.\n\n$e',
       );
     } finally {
-      if (!mounted) {
-        return;
+      // A `return` inside `finally` silently discards whatever the try/catch
+      // above was doing — use a plain `if (mounted)` guard instead.
+      if (mounted) {
+        setState(() {
+          _isVerifying = false;
+        });
       }
-
-      setState(() {
-        _isVerifying = false;
-      });
     }
   }
 
@@ -245,12 +264,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         phoneNumber: widget.phoneNumber,
         forceResendingToken: _resendToken,
         timeout: const Duration(seconds: 60),
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          try {
-            await FirebaseAuth.instance.signInWithCredential(credential);
-            await _completeSuccessfulVerification();
-          } catch (_) {}
-        },
+        // Don't auto-sign-in on resend either — same race as the initial
+        // send: user resends, then manually types the new code and hits
+        // Continue (_verifyOtp) while this callback is still alive.
+        verificationCompleted: (PhoneAuthCredential credential) {},
         verificationFailed: (FirebaseAuthException e) async {
           if (!mounted) {
             return;
@@ -300,13 +317,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         'Failed to resend OTP.\n\n$e',
       );
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
       }
-
-      setState(() {
-        _isResending = false;
-      });
     }
   }
 
@@ -363,14 +378,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Image.asset(
-                'assets/logo/goouts_logo_login.png',
+                'assets/logo/goouts_logo_white.png',
                 height: 160,
                 fit: BoxFit.contain,
+                color: _goOutsBlue,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.verified_user_rounded,
+                  size: 80,
+                  color: _goOutsBlue,
+                ),
               ),
-              SizedBox(height: 24),
-              AutoSizeText(
+              const SizedBox(height: 24),
+              const AutoSizeText(
                 'Enter Verification Code',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -379,7 +400,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   color: Colors.black87,
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               AutoSizeText(
                 'We sent a 6-digit code to ${widget.localMobileNumber}.',
                 textAlign: TextAlign.center,
@@ -389,11 +410,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   height: 1.5,
                 ),
               ),
-              SizedBox(height: 10),
-              AutoSizeText(
-                'You are continuing as a ${_accountTypeText()}.',
+              const SizedBox(height: 10),
+              const AutoSizeText(
+                'You are continuing as a Lead Partner.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   color: Colors.black45,
                   height: 1.4,
@@ -427,7 +448,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 ),
               ),
               ),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -442,7 +463,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     ),
                   ),
                   child: _isVerifying
-                      ? SizedBox(
+                      ? const SizedBox(
                           height: 22,
                           width: 22,
                           child: CircularProgressIndicator(
@@ -450,7 +471,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : AutoSizeText(
+                      : const AutoSizeText(
                           'Verify & Continue',
                           style: TextStyle(
                             fontSize: 16,

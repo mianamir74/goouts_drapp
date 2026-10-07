@@ -35,7 +35,7 @@ class _MyTicketsButtonState extends State<MyTicketsButton> {
 
     final fs = FirebaseFirestore.instance;
 
-    for (final coll in ['drivers', 'businesses', 'cab_drivers']) {
+    for (final coll in ['drivers', 'lead_partners', 'cab_drivers']) {
       try {
         final doc = await fs.collection(coll).doc(uid).get();
         if (doc.exists && doc.data() != null) {

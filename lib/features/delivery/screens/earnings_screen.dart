@@ -810,8 +810,16 @@ class _EarningsScreenState extends State<EarningsScreen> {
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) =>
-                            const WeeklyResidualSummaryScreen()),
+                        builder: (_) => WeeklyResidualSummaryScreen(
+                              residualTotal: _residualTotal,
+                              pendingPayout: _pendingPayout,
+                              driverReferralCount: _driverReferrals,
+                              merchantReferralCount: _merchantReferrals,
+                              driverResidualEarned: _driverResidual,
+                              merchantResidualEarned: _merchantResidual,
+                              driverRefs: _driverRefs,
+                              merchantRefs: _merchantRefs,
+                            )),
                   ),
                   icon: const Icon(Icons.bar_chart,
                       color: _C.accent, size: 16),

@@ -43,7 +43,7 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
     final Future<DocumentSnapshot<Map<String, dynamic>>> driverFuture =
         firestore.collection('drivers').doc(currentUser.uid).get();
     final Future<DocumentSnapshot<Map<String, dynamic>>> businessFuture =
-        firestore.collection('businesses').doc(currentUser.uid).get();
+        firestore.collection('lead_partners').doc(currentUser.uid).get();
 
     final List<DocumentSnapshot<Map<String, dynamic>>> snapshots =
         await Future.wait<DocumentSnapshot<Map<String, dynamic>>>(
@@ -66,7 +66,7 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
     if (businessLooksValid) {
       return _CurrentAccount(
         uid: currentUser.uid,
-        collection: 'businesses',
+        collection: 'lead_partners',
         isBusiness: true,
       );
     }
@@ -82,7 +82,7 @@ class _MessagesInboxScreenState extends State<MessagesInboxScreen> {
     if (businessDoc.exists) {
       return _CurrentAccount(
         uid: currentUser.uid,
-        collection: 'businesses',
+        collection: 'lead_partners',
         isBusiness: true,
       );
     }

@@ -37,7 +37,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     final Future<DocumentSnapshot<Map<String, dynamic>>> driverFuture =
         firestore.collection('drivers').doc(currentUser.uid).get();
     final Future<DocumentSnapshot<Map<String, dynamic>>> businessFuture =
-        firestore.collection('businesses').doc(currentUser.uid).get();
+        firestore.collection('lead_partners').doc(currentUser.uid).get();
 
     final List<DocumentSnapshot<Map<String, dynamic>>> snapshots =
         await Future.wait<DocumentSnapshot<Map<String, dynamic>>>(
@@ -60,7 +60,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     if (businessLooksValid) {
       return _CurrentAccount(
         uid: currentUser.uid,
-        collection: 'businesses',
+        collection: 'lead_partners',
         isBusiness: true,
       );
     }
@@ -76,7 +76,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     if (businessDoc.exists) {
       return _CurrentAccount(
         uid: currentUser.uid,
-        collection: 'businesses',
+        collection: 'lead_partners',
         isBusiness: true,
       );
     }
@@ -248,7 +248,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         return legalBusinessName;
       }
 
-      return 'Business Partner';
+      return 'Lead Partner';
     }
 
     final String fullName = _formatDisplayText(
@@ -698,7 +698,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               fallback: _readNestedString(data, const <String>['profileImage', 'photoUrl']),
             );
 
-            final String roleLabel = account.isBusiness ? 'Business Partner' : 'Driver';
+            final String roleLabel = account.isBusiness ? 'Lead Partner' : 'Driver';
             final String businessName = _buildBusinessName(data);
             final String companyNumber = _buildCompanyNumber(data);
             final String vehicleType = _buildVehicleType(data);

@@ -1,23 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../auth/intro_slides_screen.dart';
 import '../auth/login_screen.dart';
-import '../legal/terms_and_conditions_screen.dart';
+// Reuses goouts_drapp's own existing legal/support/faq screens instead of
+// duplicating them — generic, no driver_app-specific imports.
+import '../../legal/terms_and_conditions_screen.dart';
 import '../messages/business_messages_inbox_screen.dart';
 import '../profile/business_profile_screen.dart';
-import '../legal/faq_screen.dart';
+import '../../legal/faq_screen.dart';
 import '../referral/business_referral_link_screen.dart';
 import '../referral/business_referral_list_screen.dart';
-import '../referral/referral_dev_tester_screen.dart';
-import '../support/help_support_screen.dart';
-// (main.dart import removed — it was only here for RoleIntroSlidesScreen,
-// which is driver_app's class and never existed in this app.)
+import '../../support/help_support_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
+import '../../../services/fcm_service.dart';
 
 class BusinessHomeScreen extends StatefulWidget {
   const BusinessHomeScreen({super.key});
@@ -37,7 +35,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
   User? get _user => FirebaseAuth.instance.currentUser;
 
   bool _isLoading = true;
-  String _displayName = 'Business Partner';
+  String _displayName = 'Lead Partner';
   String _referralCode = 'BG0001';
   String _accountStatus = '';
   int _unreadMessagesCount = 0;
@@ -45,10 +43,31 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
   int _totalReferralsCount = 0;
   DateTime? _lastViewedAt;
 
+  // ⚠ ADDED 9 September 2026. index.js's "Residual Income" trigger (see
+  // that file's own comment header) has been crediting these four fields
+  // onto lead_partners/{uid} for real, on every completed food order referred
+  // by this Lead Partner — driverResidualEarned, merchantResidualEarned,
+  // residualTotal, pendingPayout — since 8 September 2026, but nothing in
+  // this app ever displayed them. A Lead Partner earning real residual
+  // money had no way to see it. No payout action here — GoOuts standing
+  // rule is never build a payout function — this is read-only display.
+  double _residualTotal = 0;
+  double _pendingPayout = 0;
+  double _driverResidualEarned = 0;
+  double _merchantResidualEarned = 0;
+
   @override
   void initState() {
     super.initState();
     _loadDashboard();
+    // Request notification permission after first frame (post-login).
+    // Must NOT be called at app startup — doing so triggers a second APNs
+    // registration that causes a preconditionFailure crash in Firebase iOS SDK.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // goouts_drapp's DriverFcmService exposes requestPermissionAgain(),
+      // not driver_app's askPermission() — same fire-and-forget purpose.
+      DriverFcmService.instance.requestPermissionAgain();
+    });
   }
 
   Future<void> _loadDashboard() async {
@@ -64,7 +83,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
     try {
       final FirebaseFirestore firestore = FirebaseFirestore.instance;
       final DocumentSnapshot<Map<String, dynamic>> businessDoc =
-          await firestore.collection('businesses').doc(user.uid).get();
+          await firestore.collection('lead_partners').doc(user.uid).get();
       final Map<String, dynamic> businessData =
           businessDoc.data() ?? <String, dynamic>{};
 
@@ -82,8 +101,15 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
       _lastViewedAt =
           _readDateTime(businessData, const ['lastReferralActivityViewedAt']);
 
+      _residualTotal = (businessData['residualTotal'] ?? 0).toDouble();
+      _pendingPayout = (businessData['pendingPayout'] ?? 0).toDouble();
+      _driverResidualEarned =
+          (businessData['driverResidualEarned'] ?? 0).toDouble();
+      _merchantResidualEarned =
+          (businessData['merchantResidualEarned'] ?? 0).toDouble();
+
       final QuerySnapshot<Map<String, dynamic>> messagesSnapshot = await firestore
-          .collection('businesses')
+          .collection('lead_partners')
           .doc(user.uid)
           .collection('messages')
           .orderBy('createdAt', descending: true)
@@ -91,7 +117,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
       _unreadMessagesCount = _getUnreadMessagesCount(messagesSnapshot.docs);
 
       final QuerySnapshot<Map<String, dynamic>> referralsSnapshot = await firestore
-          .collection('businesses')
+          .collection('lead_partners')
           .doc(user.uid)
           .collection('sent_invites')
           .orderBy('sentAt', descending: true)
@@ -142,19 +168,9 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
             'isReturningUser': true,
           },
         ),
-        builder: (_) => const LoginScreen(),
+        builder: (_) => const LeadPartnerLoginScreen(),
       ),
       (Route<dynamic> route) => false,
-    );
-  }
-
-  void _showComingSoon(String title) {
-    // The snackbar rewrite left the orphaned 'ScaffoldMessenger.of(context)'
-    // line above the new call, with no statement terminator.
-    GoOutsSheet.info(
-      context,
-      title: 'Coming Soon',
-      message: '$title will be connected next.',
     );
   }
 
@@ -215,21 +231,12 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                   _openScreen(context, const BusinessReferralLinkScreen());
                 },
               ),
-              if (kDebugMode)
-              _menuTile(
-                icon: Icons.slideshow_outlined,
-                title: 'Intro Slides',
-                 onTap: () {
-                    Navigator.pop(sheetContext);
-                    // Was RoleIntroSlidesScreen(accountType:, openedFromMenu:),
-                    // which is driver_app's class — it does not exist in this
-                    // app. goouts_drapp's equivalent is IntroSlidesScreen(role:).
-                    _openScreen(
-                      context,
-                      const IntroSlidesScreen(role: 'business'),
-                    );
-              },
-            ),
+              // "Intro Slides" debug-only menu item removed for the
+              // goouts_drapp merge — it pointed at driver_app's own
+              // RoleIntroSlidesScreen (defined in driver_app/lib/main.dart),
+              // which was not part of what this pass copied over. Flagged in
+              // the merge report; no equivalent intro-slides screen exists
+              // in goouts_drapp today.
               _menuTile(
                 icon: Icons.support_agent_outlined,
                 title: 'Help & Support',
@@ -239,7 +246,7 @@ class _BusinessHomeScreenState extends State<BusinessHomeScreen> {
                     context,
                     const HelpSupportScreen(
                       accountType: 'business',
-                      collectionName: 'businesses',
+                      collectionName: 'lead_partners',
                     ),
                   );
                 },
@@ -367,7 +374,7 @@ Widget _menuTile({
     final String legalBusinessName =
         _titleCase((data?['legalBusinessName'] ?? '').toString());
     if (legalBusinessName.isNotEmpty) return legalBusinessName;
-    return user.phoneNumber ?? 'Business Partner';
+    return user.phoneNumber ?? 'Lead Partner';
   }
 
   int _getUnreadMessagesCount(
@@ -432,9 +439,9 @@ Widget _menuTile({
       clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -530,10 +537,10 @@ Widget _menuTile({
                 clipBehavior: Clip.antiAlias,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.22),
+                  color: Colors.white.withValues(alpha: 0.22),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                     width: 1.2,
                   ),
                 ),
@@ -581,9 +588,9 @@ Widget _menuTile({
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
             ),
             child: Row(
               children: [
@@ -649,6 +656,167 @@ Widget _menuTile({
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ⚠ ADDED 9 September 2026 alongside the state fields above. Read-only —
+  // shows real money already credited by index.js's Residual Income
+  // trigger. "Pending Payout" is exactly that: accrued but not yet paid
+  // out. No button here initiates a transfer (GoOuts standing rule: never
+  // build a payout function) — a partner who wants to be paid contacts
+  // GoOuts directly until a real payout flow is designed and approved.
+  Widget _residualCard({
+    required double residualTotal,
+    required double pendingPayout,
+    required double driverResidualEarned,
+    required double merchantResidualEarned,
+  }) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: _softBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                clipBehavior: Clip.antiAlias,
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: _softBlueTint,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.savings_outlined, color: _goOutsBlue),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: AutoSizeText(
+                  'Residual Income',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: _textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const AutoSizeText('Total Earned',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _textSecondary)),
+                    const SizedBox(height: 4),
+                    AutoSizeText(
+                      '£${residualTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(width: 1, height: 34, color: _softBorder),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const AutoSizeText('Pending Payout',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _textSecondary)),
+                    const SizedBox(height: 4),
+                    AutoSizeText(
+                      '£${pendingPayout.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _goOutsBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _softBlueTint,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AutoSizeText('Driver referrals',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _textSecondary)),
+                      const SizedBox(height: 2),
+                      AutoSizeText(
+                        '£${driverResidualEarned.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _textPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AutoSizeText('Merchant referrals',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: _textSecondary)),
+                      const SizedBox(height: 2),
+                      AutoSizeText(
+                        '£${merchantResidualEarned.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _textPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const AutoSizeText(
+            'Earned from orders placed by drivers and restaurants you referred. Contact GoOuts to arrange payout.',
+            style: TextStyle(
+                fontSize: 11, color: _textSecondary, height: 1.35),
           ),
         ],
       ),
@@ -756,7 +924,7 @@ Widget _menuTile({
         scrolledUnderElevation: 0,
         centerTitle: true,
         title: AutoSizeText(
-          'GoOuts Business Partner',
+          'GoOuts Lead Partner',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -789,6 +957,13 @@ Widget _menuTile({
                       referralActivityCount: _referralActivityCount,
                       totalReferralsCount: _totalReferralsCount,
                       accountStatus: _accountStatus,
+                    ),
+                    const SizedBox(height: 24),
+                    _residualCard(
+                      residualTotal: _residualTotal,
+                      pendingPayout: _pendingPayout,
+                      driverResidualEarned: _driverResidualEarned,
+                      merchantResidualEarned: _merchantResidualEarned,
                     ),
                     const SizedBox(height: 24),
                     Container(
@@ -868,28 +1043,6 @@ Widget _menuTile({
                         ),
                       ],
                     ),
-                    if (kDebugMode) ...[
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _openScreen(
-                            context,
-                            const ReferralDevTesterScreen(),
-                          ),
-                          icon: const Icon(Icons.science_outlined, size: 18),
-                          label: const Text('Dev: Create Test Entries'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF6B7280),
-                            side: BorderSide(color: Colors.grey.shade300),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

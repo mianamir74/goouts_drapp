@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'support_ticket_chat_screen.dart';
 
 class MyTicketsScreen extends StatefulWidget {
-  final String sourceCollection; // 'drivers' | 'cab_drivers' | 'businesses'
+  final String sourceCollection; // 'drivers' | 'cab_drivers' | 'lead_partners'
   final String driverName;
 
   const MyTicketsScreen({

@@ -35,11 +35,15 @@ class _BusinessReferralCodeScreenState
     (_) => FocusNode(),
   );
 
-  // CRITICAL FIX: separate FocusNodes for the KeyboardListener wrappers — a
-  // FocusNode can only be attached to one widget at a time. Sharing one
-  // between the KeyboardListener and its TextField makes them fight over
-  // attaching it, looping unbounded and blowing memory until iOS kills the
-  // app. Same crash as driver_app. skipTraversal keeps these out of tab order.
+  // CRITICAL FIX: separate FocusNodes for the KeyboardListener wrappers.
+  // A FocusNode can only be attached to one widget at a time. Previously
+  // _focusNodes[index] was passed to BOTH the KeyboardListener and the
+  // TextField it wraps, so the two fought over attaching the same node in
+  // the focus tree — each reattach fired a notification, rebuilt, and
+  // reattached again, unbounded. With 8 boxes built at once this allocated
+  // multiple GB in seconds and got the app killed by iOS as out-of-memory
+  // (an uncatchable kernel SIGKILL — no try/catch or timeout can stop it).
+  // skipTraversal keeps these out of tab order so they never steal focus.
   final List<FocusNode> _keyEventFocusNodes = List<FocusNode>.generate(
     8,
     (_) => FocusNode(skipTraversal: true),

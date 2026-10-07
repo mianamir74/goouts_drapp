@@ -1,7 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:auto_size_text/auto_size_text.dart';
-    import 'package:firebase_auth/firebase_auth.dart';
-    import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+// Reuses goouts_drapp's existing, live features/support/support_ticket_chat_screen.dart
+// (same constructor shape: ticketId/subject/ticketNumber/driverName/sourceCollection).
+import '../../support/support_ticket_chat_screen.dart';
+import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
     class BusinessMessagesInboxScreen extends StatefulWidget {
       const BusinessMessagesInboxScreen({super.key});
@@ -16,13 +20,37 @@ import 'package:auto_size_text/auto_size_text.dart';
       static const Color _screenBackground = Color(0xFFF2F3F7);
 
       String _searchQuery = '';
+      String _businessName = 'Business';
 
       @override
       void initState() {
         super.initState();
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _markAllMessagesAsRead();
+          _loadBusinessName();
         });
+      }
+
+      Future<void> _loadBusinessName() async {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('lead_partners')
+              .doc(user.uid)
+              .get();
+          final d = doc.data() ?? {};
+          final name = (d['legalBusinessName'] ??
+                  d['companyName'] ??
+                  d['businessName'] ??
+                  d['name'] ??
+                  '')
+              .toString()
+              .trim();
+          if (name.isNotEmpty && mounted) {
+            setState(() => _businessName = name);
+          }
+        } catch (_) {}
       }
 
       Future<void> _markAllMessagesAsRead() async {
@@ -64,6 +92,21 @@ import 'package:auto_size_text/auto_size_text.dart';
           }
           await batch.commit();
         } catch (_) {}
+      }
+
+      // ── Swipe helpers ────────────────────────────────────────────────────────
+      Future<void> _archiveMessage(String uid, String msgId) async {
+        await FirebaseFirestore.instance
+            .collection('lead_partners').doc(uid)
+            .collection('messages').doc(msgId)
+            .set({'isArchived': true}, SetOptions(merge: true));
+      }
+
+      Future<void> _deleteMessage(String uid, String msgId) async {
+        await FirebaseFirestore.instance
+            .collection('lead_partners').doc(uid)
+            .collection('messages').doc(msgId)
+            .delete();
       }
 
       String _readString(Map<String, dynamic> data, List<String> keys) {
@@ -169,8 +212,10 @@ import 'package:auto_size_text/auto_size_text.dart';
 
                     final docs = snapshot.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                     final filtered = docs.where((doc) {
-                      if (_searchQuery.isEmpty) return true;
                       final data = doc.data();
+                      // Hide archived messages
+                      if (data['isArchived'] == true) return false;
+                      if (_searchQuery.isEmpty) return true;
                       final blob = [
                         _readString(data, const <String>['title', 'subject']),
                         _readString(data, const <String>['body', 'message', 'content']),
@@ -196,15 +241,129 @@ import 'package:auto_size_text/auto_size_text.dart';
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
-                        final data = filtered[index].data();
-                        final title = _readString(data, const <String>['title', 'subject']);
+                        final doc     = filtered[index];
+                        final docId   = doc.id;
+                        final data    = doc.data();
+                        final title   = _readString(data, const <String>['title', 'subject']);
                         final preview = _readString(data, const <String>['preview', 'body', 'message', 'content']);
                         final senderName = _readString(data, const <String>['senderName', 'fromName', 'from']);
                         final createdAt = _readDateTime(data);
                         final body = _readString(data, const <String>['body', 'message', 'content', 'preview']);
 
-                        return InkWell(
+                        return Dismissible(
+                          key: ValueKey(docId),
+                          direction: DismissDirection.horizontal,
+
+                          // Swipe RIGHT → Archive (teal)
+                          background: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0891B2),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.only(left: 24),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.archive_rounded, color: Colors.white, size: 26),
+                                SizedBox(height: 4),
+                                Text('Archive', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                              ],
+                            ),
+                          ),
+
+                          // Swipe LEFT → Delete (red)
+                          secondaryBackground: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 24),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.delete_rounded, color: Colors.white, size: 26),
+                                SizedBox(height: 4),
+                                Text('Delete', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                              ],
+                            ),
+                          ),
+
+                          confirmDismiss: (direction) async {
+                            if (direction == DismissDirection.startToEnd) return true;
+                            return await showDialog<bool>(
+                              context: context,
+                              builder: (_) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                                title: const Text('Delete message?', style: TextStyle(fontWeight: FontWeight.w800)),
+                                content: const Text('This will permanently remove the message from your inbox.'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFDC2626),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () => Navigator.pop(context, true),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            ) ?? false;
+                          },
+
+                          onDismissed: (direction) async {
+                            if (direction == DismissDirection.startToEnd) {
+                              await _archiveMessage(currentUser.uid, docId);
+                              if (context.mounted) {
+                                GoOutsSheet.info(context, title: 'Archived', message: 'Message archived.');
+                              }
+                            } else {
+                              await _deleteMessage(currentUser.uid, docId);
+                              if (context.mounted) {
+                                GoOutsSheet.error(context, title: 'Deleted', message: 'Message deleted.');
+                              }
+                            }
+                          },
+
+                          child: InkWell(
                           onTap: () {
+                            // Support reply — go straight to ticket chat
+                            final ticketId = _readString(
+                              data,
+                              const <String>['ticketId', 'ticket_id', 'supportTicketId'],
+                            );
+                            if (ticketId.isNotEmpty) {
+                              final rawNum = _readString(
+                                data,
+                                const <String>['ticketNumber', 'ticket_number'],
+                              );
+                              final displayNum = rawNum.isNotEmpty
+                                  ? (rawNum.startsWith('SR-') ? rawNum : 'SR-$rawNum')
+                                  : 'SR-${ticketId.substring(0, ticketId.length >= 8 ? 8 : ticketId.length).toUpperCase()}';
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => SupportTicketChatScreen(
+                                    ticketId: ticketId,
+                                    subject: title.isEmpty ? 'Support Request' : title,
+                                    ticketNumber: displayNum,
+                                    driverName: _businessName,
+                                    sourceCollection: 'lead_partners',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Regular admin message — show dialog
                             showDialog<void>(
                               context: context,
                               builder: (context) => AlertDialog(
@@ -286,7 +445,8 @@ import 'package:auto_size_text/auto_size_text.dart';
                               ],
                             ),
                           ),
-                        );
+                        ),  // InkWell
+                        );  // Dismissible
                       },
                     );
                   },

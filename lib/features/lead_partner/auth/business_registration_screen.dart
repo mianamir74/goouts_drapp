@@ -1,5 +1,5 @@
 import 'dart:io';
-import '../../services/address_lookup_service.dart';
+import 'services/address_lookup_service.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,13 +7,21 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+// image_orientation is no longer imported here — normaliseOrientation now runs
+// inside LivenessSelfieScreen, on the frame it captured, before it hands the
+// path back.
+// Reuses goouts_drapp's own lib/screens/liveness_selfie_screen.dart — confirmed
+// byte-identical to driver_app's copy at merge time (11 Sep 2026), so this
+// points at the app's existing shared copy instead of duplicating it.
+import '../../../screens/liveness_selfie_screen.dart';
 
 import '../home/business_home_screen.dart';
-import '../legal/terms_and_conditions_screen.dart';
+// Reuses goouts_drapp's own lib/features/legal/terms_and_conditions_screen.dart
+// (generic, no driver_app-specific imports) instead of duplicating it.
+import '../../legal/terms_and_conditions_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
-import '../../screens/liveness_selfie_screen.dart';
 
 class BusinessRegistrationScreen extends StatefulWidget {
   const BusinessRegistrationScreen({
@@ -34,25 +42,17 @@ class _BusinessRegistrationScreenState
     extends State<BusinessRegistrationScreen> {
   static const Color _goOutsBlue = Color(0xFF0392CA);
   static const Color _successGreen = Color(0xFF16A34A);
-  static const String _termsUrl = 'https://example.com/goouts-terms';
   static const String _defaultBusinessReferralCode = 'GB000001';
   static const String _defaultCountry = 'UNITED KINGDOM';
   static const String _northernIrelandCountry = 'NORTHERN IRELAND';
-  // _mapboxPublicToken removed 13 August 2026. This screen declared its own
-  // copy of the Mapbox token and never used it — every lookup goes through
-  // AddressLookupService. A dead field holding a credential is the worst of
-  // both: no benefit, and one more place a token gets pasted back in.
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final AddressLookupService _addressService = AddressLookupService();
   // ⚠ THE ImagePicker FIELD WAS REMOVED 24 August 2026. The selfie now comes
-  // from LivenessSelfieScreen, which owns its own camera, and this screen has
-  // no other picker call. The image_picker import stays because XFile comes
-  // from it and _selfieImage is still an XFile — dropping that import breaks
-  // the build in a way that reads as unrelated to this change.
-  //
-  // registration_screen.dart still holds its own field: that screen picks the
-  // identity DOCUMENTS as well, and those still go through image_picker.
+  // from LivenessSelfieScreen, which owns its own camera. The image_picker
+  // import stays because XFile comes from it and _selfieImage is still an
+  // XFile — dropping that import breaks the build in a way that reads as
+  // unrelated to this change.
 
   final List<String> _prefixOptions = <String>['Mr', 'Mrs', 'Miss', 'Ms', 'Dr'];
   final List<String> _countryOptions = <String>[
@@ -142,6 +142,29 @@ class _BusinessRegistrationScreenState
   double? _verifiedLongitude;
   // Locked only when address was actually auto-filled from OS bottom sheet.
   bool _addressFieldsLocked = false;
+
+  /// True when the applicant gave up on the lookup and typed their address in
+  /// by hand.
+  ///
+  /// ── WHY THIS EXISTS ────────────────────────────────────────────────────
+  ///
+  /// 14 August 2026, reported as: "postcode lookup says address not found, so
+  /// I enter it manually, and then it always says enter postcode even though
+  /// it IS entered."
+  ///
+  /// It was a dead end and it was not subtle. "Enter manually" cleared
+  /// _isPostcodeVerified so the fields became editable — and the submit guard
+  /// hard-required _isPostcodeVerified == true. So choosing manual entry made
+  /// the form permanently unsubmittable, and the error pointed at the postcode
+  /// box, which was full. Nothing the applicant typed could ever satisfy it.
+  ///
+  /// Anyone whose address Mapbox does not know — a new build, a flat
+  /// subdivision, a rural address — could not register at all.
+  ///
+  /// The address is still recorded as UNVERIFIED (postcodeVerified: false), so
+  /// an admin can see it was hand-typed. That is the honest outcome: let them
+  /// through, and mark how they got in.
+  bool _manualAddressEntry = false;
   List<MapboxSuggestResult> _addressSuggestions = [];
   String _mapboxSessionToken = AddressLookupService.generateSessionToken();
   bool _isLookingUpAddress = false;
@@ -150,10 +173,11 @@ class _BusinessRegistrationScreenState
 
   /// What the phone thought of the selfie, and whether the head-sweep finished.
   ///
-  /// ⚠ ADVISORY ONLY. Client-written and trivially forgeable, so nothing
-  /// automated may key off them. New on 24 August 2026 — before that this
-  /// screen stored a photograph with no opinion attached, because it ran no
-  /// check at all.
+  /// ⚠ ADVISORY ONLY. Client-written, trivially forgeable, so nothing automated
+  /// may key off them. They exist so a reviewer opening the photograph knows
+  /// whether the device was happy with it — the difference between a considered
+  /// approval and a blind one. Until 24 August 2026 this screen stored no
+  /// opinion of any kind, because it ran no check of any kind.
   bool _livenessComplete = false;
   String _livenessNote = '';
   String? _selfieAdvice;
@@ -215,7 +239,6 @@ class _BusinessRegistrationScreenState
         _selectedCity = null;
       }
     });
-    _townController.clear();
   }
 
   String _normalizeUkPostcode(String input) {
@@ -250,48 +273,6 @@ class _BusinessRegistrationScreenState
     return _defaultCountry;
   }
 
-  Map<String, dynamic> _asMap(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value;
-    }
-    if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return <String, dynamic>{};
-  }
-
-  String _readMapString(Map<String, dynamic> map, String key) {
-    final dynamic value = map[key];
-    if (value == null) {
-      return '';
-    }
-    return value.toString().trim();
-  }
-
-  String _readContextName(Map<String, dynamic> context, String key) {
-    final dynamic value = context[key];
-    if (value is Map) {
-      final Map<String, dynamic> valueMap = Map<String, dynamic>.from(value);
-      final String name = _readMapString(valueMap, 'name');
-      if (name.isNotEmpty) {
-        return name;
-      }
-    }
-    if (value is String) {
-      return value.trim();
-    }
-    return '';
-  }
-
-  String _firstNonEmpty(List<String> values) {
-    for (final String value in values) {
-      if (value.trim().isNotEmpty) {
-        return value.trim();
-      }
-    }
-    return '';
-  }
-
   String _normalizeForMatching(String value) {
     return value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
   }
@@ -310,24 +291,6 @@ class _BusinessRegistrationScreenState
       }
     }
     return null;
-  }
-
-  String _extractCityFromPostcodeFeature(
-    Map<String, dynamic> feature,
-    List<String> cityOptions,
-  ) {
-    final Map<String, dynamic> properties = _asMap(feature['properties']);
-    final Map<String, dynamic> context = _asMap(properties['context']);
-
-    final String candidate = _firstNonEmpty(<String>[
-      _readContextName(context, 'place'),
-      _readContextName(context, 'locality'),
-      _readContextName(context, 'district'),
-      _readMapString(properties, 'name'),
-    ]);
-
-    final String? matched = _matchCityOption(candidate, cityOptions);
-    return matched ?? '';
   }
 
   void _showSnackBarMessage(String message) {
@@ -367,27 +330,19 @@ class _BusinessRegistrationScreenState
 
       // ── ⚠ THE LIVE CAMERA REPLACED image_picker HERE, 24 August 2026 ───────
       //
-      // This was the worst selfie path in the estate and it is worth recording
-      // why, because both faults were invisible from the outside.
+      // And it closed a real hole while it was at it. The note that used to sit
+      // below said, correctly, that THIS SCREEN RAN NO FACE CHECK AT ALL — it
+      // stored whatever the camera returned. A photograph of a wall, a shoe or
+      // the ceiling was accepted as a business partner's identity selfie and
+      // only discovered when an admin opened it days later.
       //
-      // 1. imageQuality: 85 AND maxWidth: 1200 — the exact combination
-      //    documented across this codebase as destroying identity photographs.
-      //    Either one makes image_picker re-encode the file, which DROPS the
-      //    EXIF orientation tag WITHOUT rotating the pixels. The result is a
-      //    sideways photograph with nothing left to say it is sideways.
+      // LivenessSelfieScreen will not hand back a photograph with no usable
+      // face in it: it keeps scanning instead of returning. So this screen now
+      // gets the same standard as the consumer app without a line of checking
+      // code of its own.
       //
-      // 2. NO CHECK OF ANY KIND. Whatever the camera returned was assigned
-      //    straight to _selfieImage. A wall, a shoe or the ceiling was accepted
-      //    as a business partner's identity selfie and discovered only when an
-      //    admin opened it days later — if they opened it.
-      //
-      // This app also had no image_orientation.dart and no face check service
-      // at all, so neither fault could have been fixed here in isolation. Both
-      // arrived with this change.
-      //
-      // ⚠ LivenessSelfieScreen RETURNS THE FINISHED ARTICLE — upright,
-      // downscaled and inspected, and it will not hand back a photograph with
-      // no usable face in it. Do not add a resize or a re-check here.
+      // ⚠ IT RETURNS THE FINISHED ARTICLE — already upright, downscaled and
+      // inspected. Do NOT re-run normaliseOrientation or the inspector here.
       final LivenessSelfieResult? shot =
           await LivenessSelfieScreen.open(context);
 
@@ -395,15 +350,16 @@ class _BusinessRegistrationScreenState
         return;
       }
 
-      // null means they backed out without taking one. Nothing happened.
+      // null means they backed out without taking one. Nothing happened, and
+      // nothing should be said about it.
       if (shot != null) {
         setState(() {
           _selfieImage = XFile(shot.path);
           _showSelfieError = false;
-          // ⚠ ADVISORY, NEVER A DECISION — client-written and trivially
-          // forged. false means the head-sweep ran out of time and the photo
-          // was taken anyway: a note telling a reviewer to look harder, not a
-          // rejection. The app assists, the admin judges.
+          // ⚠ ADVISORY, NEVER A DECISION — written by the client and trivial
+          // to forge. false means the head-sweep ran out of time and the photo
+          // was taken anyway, which tells a reviewer to look harder. It is not
+          // a rejection: the app assists, the admin judges.
           _livenessComplete = shot.livenessComplete;
           _livenessNote = shot.livenessNote;
           _selfieAdvice = shot.advice;
@@ -445,7 +401,7 @@ class _BusinessRegistrationScreenState
   }) async {
     final Reference ref = FirebaseStorage.instance
         .ref()
-        .child('businesses')
+        .child('lead_partners')
         .child('selfies')
         .child('$uid.jpg');
     await ref.putFile(File(selfieImage.path));
@@ -481,14 +437,6 @@ class _BusinessRegistrationScreenState
     }
   }
 
-  /// Mapbox postcode validation (Mapbox-only, no OS).
-  ///
-  /// User types postcode → taps "Look Up Postcode" → single Mapbox call:
-  ///   • confirms postcode is real
-  ///   • returns local area name  → auto-fills Town
-  ///   • inferCityFromPostcode()  → auto-selects City dropdown
-  ///   • inferCountryFromPostcode → auto-selects Country dropdown
-  /// Owner types Shop/Unit No and Road Name manually.
   Future<void> _confirmPostcode() async {
     FocusScope.of(context).unfocus();
 
@@ -568,51 +516,50 @@ class _BusinessRegistrationScreenState
       _isLookingUpAddress = true;
       _addressSuggestions = [];
     });
-    final MapboxAddressResult? result = await _addressService.retrieve(
+    final MapboxAddressResult? address = await _addressService.retrieve(
       suggestion.mapboxId,
       _mapboxSessionToken,
     );
+    // retrieve() is the billed call — rotate the token so the NEXT lookup
+    // starts a fresh free suggest() session.
     _mapboxSessionToken = AddressLookupService.generateSessionToken();
 
     if (!mounted) return;
 
-    if (result == null) {
+    if (address == null) {
       setState(() => _isLookingUpAddress = false);
       _showSnackBarMessage('Could not load that address — please try again.');
       return;
     }
 
-    final String postcode = result.postcode;
-    final String? inferredCity =
-        AddressLookupService.inferCityFromPostcode(postcode);
-    final String resolvedCountry = _inferCountryFromPostcode(postcode);
-    final List<String> cityOptions =
-        _cityOptionsByCountry[resolvedCountry] ?? <String>[];
+    _onAddressSelected(address);
+    setState(() => _isLookingUpAddress = false);
+  }
+
+  /// Fills every address field from a fully-resolved Mapbox result.
+  void _onAddressSelected(MapboxAddressResult address) {
+    final String resolvedCountry = _inferCountryFromPostcode(address.postcode);
+    final List<String> cityOptions = _cityOptionsByCountry[resolvedCountry] ?? <String>[];
+    final String? inferredCity = AddressLookupService.inferCityFromPostcode(address.postcode);
     final String? matchedCity = inferredCity != null
         ? _matchCityOption(inferredCity, cityOptions)
-        : (result.city.isNotEmpty
-            ? _matchCityOption(result.city, cityOptions)
-            : null);
-
+        : (address.city.isNotEmpty ? _matchCityOption(address.city, cityOptions) : null);
     setState(() {
-      _isLookingUpAddress = false;
-      _postcodeController.text = postcode;
-      _shopUnitNoController.text = result.houseNumber?.isNotEmpty == true
-          ? result.houseNumber!
+      _postcodeController.text   = address.postcode;
+      _shopUnitNoController.text = address.houseNumber?.isNotEmpty == true
+          ? address.houseNumber!
           : _shopUnitNoController.text;
-      _roadNameController.text = result.street ?? '';
-      _townController.text = (result.town ?? result.city).toUpperCase();
-      _selectedCountry = resolvedCountry;
-      _selectedCity = matchedCity;
-      _verifiedUprn = '';
-      _verifiedFullAddress = result.fullAddress;
-      _verifiedLatitude = result.latitude;
-      _verifiedLongitude = result.longitude;
-      _isPostcodeVerified = true;
-      _addressFieldsLocked = false;
+      _roadNameController.text          = address.street ?? '';
+      _townController.text       = (address.town ?? address.city).toUpperCase();
+      _selectedCountry           = resolvedCountry;
+      _selectedCity              = matchedCity;
+      _verifiedFullAddress       = address.fullAddress;
+      _verifiedLatitude          = address.latitude;
+      _verifiedLongitude         = address.longitude;
+      _isPostcodeVerified        = true;
+      _addressFieldsLocked       = false;
+      _addressSuggestions        = [];
     });
-
-    _showSnackBarMessage('Address verified and filled in below.');
   }
 
   /// Tapped when the owner picks "Edit manually". Clears verified state.
@@ -624,11 +571,12 @@ class _BusinessRegistrationScreenState
       _verifiedLatitude = null;
       _verifiedLongitude = null;
       _addressFieldsLocked = false;
-      _addressSuggestions = [];
+      // Unlocks the submit guard. Without this the fields become editable and
+      // the form still refuses to accept them.
+      _manualAddressEntry = true;
     });
-    _townController.clear();
     _showSnackBarMessage(
-      'Address fields are now editable. Re-tap "Look Up Address" to re-verify.',
+      'Address fields are now editable. Re-tap "Find Official Address" to re-verify.',
     );
   }
 
@@ -746,9 +694,31 @@ class _BusinessRegistrationScreenState
       return;
     }
 
-    if (!_isPostcodeVerified) {
-      _showSnackBarMessage('Please confirm your postcode before continuing.');
+    // Verified by lookup, OR typed by hand after the lookup failed. The form
+    // validator has already checked the postcode is a valid UK format; this
+    // only decides whether it also had to be CONFIRMED against Mapbox.
+    if (!_isPostcodeVerified && !_manualAddressEntry) {
+      _showSnackBarMessage(
+        'Tap "Look Up Address" to confirm your postcode, or use '
+        '"Enter manually" if your address is not found.',
+      );
       return;
+    }
+
+    // Manual entry still needs the fields actually filled in — the lookup
+    // normally populates these, and nothing else would catch them being blank.
+    if (_manualAddressEntry) {
+      if (_postcodeController.text.trim().isEmpty) {
+        _showSnackBarMessage('Please enter your postcode.');
+        return;
+      }
+      if (_roadNameController.text.trim().isEmpty ||
+          _townController.text.trim().isEmpty) {
+        _showSnackBarMessage(
+          'Please enter your street and town.',
+        );
+        return;
+      }
     }
 
     if (_selectedCountry == null || _selectedCountry!.trim().isEmpty) {
@@ -842,6 +812,10 @@ class _BusinessRegistrationScreenState
         'postcodeVerified': _isPostcodeVerified,
         'postcodeVerificationProvider':
             _isPostcodeVerified ? 'os_mapbox_hybrid' : '',
+        // Flags a hand-typed address for the admin reviewer. An unverified
+        // address is acceptable; an unverified address nobody KNOWS is
+        // unverified is not.
+        'addressEnteredManually': _manualAddressEntry,
         'addressUprn': _verifiedUprn,
         'addressFull': _verifiedFullAddress,
         'addressLatitude': _verifiedLatitude,
@@ -858,10 +832,15 @@ class _BusinessRegistrationScreenState
         'referralCode': ownReferralCode,
         'profilePhotoUrl': profilePhotoUrl,
         'selfieUrl': profilePhotoUrl,
-        // ⚠ ADVISORY, NEVER A DECISION. Client-written and trivially forged.
-        // livenessComplete false means the head-sweep ran out of time and the
-        // photo was taken anyway — a note telling a reviewer to look harder,
-        // not a rejection.
+        // ── WHAT THE PHONE THOUGHT OF THE SELFIE ──────────────────────────
+        //
+        // New on 24 August 2026 — this screen previously stored a photograph
+        // with no opinion attached, because it ran no check at all.
+        //
+        // ⚠ ADVISORY, NEVER A DECISION. Client-written and trivially forged,
+        // so nothing automated may key off them. livenessComplete false means
+        // the head-sweep ran out of time and the photo was taken anyway; that
+        // is a note telling a reviewer to look harder, NOT a rejection.
         'livenessComplete': _livenessComplete,
         if (_livenessNote.isNotEmpty) 'livenessNote': _livenessNote,
         if (_selfieAdvice != null) 'selfieAdvice': _selfieAdvice,
@@ -880,7 +859,7 @@ class _BusinessRegistrationScreenState
       }
 
       await FirebaseFirestore.instance
-          .collection('businesses')
+          .collection('lead_partners')
           .doc(currentUser.uid)
           .set(businessData, SetOptions(merge: true));
 
@@ -1014,19 +993,6 @@ class _BusinessRegistrationScreenState
     return null;
   }
 
-  String? _companyNumberValidator(String? value) {
-    final String input = value?.trim().toUpperCase() ?? '';
-    if (input.isEmpty) return 'Company Registration No is required';
-    final RegExp companyNumberRegex = RegExp(
-      r'^(?:\d{8}|SC\d{6}|NI\d{6})$',
-      caseSensitive: false,
-    );
-    if (!companyNumberRegex.hasMatch(input)) {
-      return 'Enter a valid UK company number';
-    }
-    return null;
-  }
-
   String? _emailValidator(String? value) {
     final String email = value?.trim() ?? '';
     if (email.isEmpty) {
@@ -1136,11 +1102,11 @@ class _BusinessRegistrationScreenState
             padding: const EdgeInsets.all(18),
             children: <Widget>[
               _buildSectionCard(
-                title: 'Business Partner Details',
+                title: 'Lead Partner Details',
                 subtitle: 'Complete your business registration details below.',
                 children: <Widget>[
                   DropdownButtonFormField<String>(
-                    value: _selectedPrefix,
+                    initialValue: _selectedPrefix,
                     decoration: _completedInputDecoration(
                       label: 'Prefix',
                       complete: _isPrefixComplete,
@@ -1336,9 +1302,9 @@ class _BusinessRegistrationScreenState
               _buildSectionCard(
                 title: 'Business Address',
                 subtitle:
-                    'Enter your Shop/Unit No and postcode, then tap "Look Up Address" and pick from the list.',
+                    'Enter your Shop/Unit No and postcode → tap "Look Up Address" → pick from the list.',
                 children: <Widget>[
-                  // ── Loading bar while lookup runs ──────────────────────
+                  // ── Loading bar while OS lookup runs ───────────────────
                   if (_isConfirmingPostcode)
                     const Padding(
                       padding: EdgeInsets.only(bottom: 12),
@@ -1354,11 +1320,14 @@ class _BusinessRegistrationScreenState
                     controller: _shopUnitNoController,
                     readOnly: _addressFieldsLocked,
                     decoration: _completedInputDecoration(
-                      label: 'Shop / Unit No or Name',
+                      label: 'Shop/Unit No',
                       complete: _isShopUnitComplete,
+                      helperText: _addressFieldsLocked
+                          ? 'Auto-filled from official record'
+                          : null,
                     ),
                     validator: (String? value) =>
-                        _requiredValidator(value, 'Shop / Unit No or Name'),
+                        _requiredValidator(value, 'Shop/Unit No'),
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
@@ -1434,20 +1403,20 @@ class _BusinessRegistrationScreenState
                       ),
                     ],
                   ),
+                  SizedBox(height: 8),
 
-                  // ── Address dropdown ─────────────────────────────────
+                  // ── Address dropdown (after Look Up returns results) ────
                   if (_addressSuggestions.isNotEmpty) ...[
-                    const SizedBox(height: 10),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _goOutsBlue.withOpacity(0.2)),
+                        border: Border.all(color: Color(0xFF0392CA).withValues(alpha: 0.2)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 8,
-                            offset: const Offset(0, 3),
+                            offset: Offset(0, 3),
                           ),
                         ],
                       ),
@@ -1469,10 +1438,12 @@ class _BusinessRegistrationScreenState
                             onTap: () => _onSuggestionSelected(s),
                             borderRadius: BorderRadius.circular(8),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.location_on_outlined, color: _goOutsBlue, size: 16),
+                                  const Icon(Icons.location_on_outlined,
+                                      color: Color(0xFF0392CA), size: 16),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
@@ -1488,12 +1459,16 @@ class _BusinessRegistrationScreenState
                                         ),
                                         Text(
                                           s.placeFormatted,
-                                          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[500],
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 16),
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: Colors.grey, size: 16),
                                 ],
                               ),
                             ),
@@ -1502,9 +1477,9 @@ class _BusinessRegistrationScreenState
                         ],
                       ),
                     ),
+                    const SizedBox(height: 8),
                   ],
                   if (_isLookingUpAddress) ...[
-                    const SizedBox(height: 10),
                     const Row(
                       children: [
                         SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
@@ -1512,55 +1487,49 @@ class _BusinessRegistrationScreenState
                         Text('Loading address…', style: TextStyle(fontSize: 12)),
                       ],
                     ),
+                    const SizedBox(height: 8),
                   ],
-                  SizedBox(height: 8),
 
-                  // ── Verified banner / Manual entry link ───────────────
+                  // ── Verified subtitle / Manual entry link ──────────────
                   if (_isPostcodeVerified)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _successGreen.withOpacity(0.07),
-                        borderRadius: BorderRadius.circular(10),
-                        border:
-                            Border.all(color: _successGreen.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: <Widget>[
-                          const Icon(Icons.check_circle_outline_rounded,
-                              size: 16, color: _successGreen),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'Postcode confirmed — fill in your shop number and road name below.',
-                              style: TextStyle(
-                                color: _successGreen,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                height: 1.4,
-                              ),
+                    Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.shield_rounded,
+                          size: 16,
+                          color: _successGreen,
+                        ),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Official UPRN Address Verified',
+                            style: TextStyle(
+                              color: _successGreen,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
                             ),
                           ),
-                          TextButton(
-                            onPressed: _isConfirmingPostcode
-                                ? null
-                                : _handleEditManually,
-                            style: TextButton.styleFrom(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                              minimumSize: const Size(0, 32),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              foregroundColor: _goOutsBlue,
-                            ),
-                            child: const AutoSizeText(
-                              'Edit',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        TextButton(
+                          onPressed: _isConfirmingPostcode
+                              ? null
+                              : _handleEditManually,
+                          style: TextButton.styleFrom(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            foregroundColor: _goOutsBlue,
+                          ),
+                          child: AutoSizeText(
+                            'Edit manually',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     )
                   else
                     Align(
@@ -1569,8 +1538,8 @@ class _BusinessRegistrationScreenState
                         onPressed: _isConfirmingPostcode
                             ? null
                             : _handleEditManually,
-                        icon: const Icon(Icons.edit_rounded, size: 16),
-                        label: const AutoSizeText(
+                        icon: Icon(Icons.edit_rounded, size: 16),
+                        label: AutoSizeText(
                           "Can't find your address? Enter manually",
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
@@ -1587,24 +1556,23 @@ class _BusinessRegistrationScreenState
                     ),
                   const SizedBox(height: 12),
 
-                  // ── Road Name ──────────────────────────────────────────
+                  // ── Road Name ─────────────────────────────────────────
                   TextFormField(
                     controller: _roadNameController,
                     readOnly: _addressFieldsLocked,
                     decoration: _completedInputDecoration(
-                      label: 'Road Name',
+                      label: 'Street / Road Name',
                       complete: _isRoadNameComplete,
                     ),
                     validator: (String? value) =>
-                        _requiredValidator(value, 'Road Name'),
+                        _requiredValidator(value, 'Street / Road Name'),
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
 
-                  // ── Town (auto-filled from Mapbox) ─────────────────────
+                  // ── Town (auto-filled from Mapbox) ────────────────────
                   TextFormField(
                     controller: _townController,
-                    textCapitalization: TextCapitalization.characters,
                     decoration: _completedInputDecoration(
                       label: 'Town',
                       complete: _townController.text.trim().isNotEmpty,
@@ -1613,15 +1581,16 @@ class _BusinessRegistrationScreenState
                           ? 'Auto-filled from postcode'
                           : null,
                     ),
+                    textCapitalization: TextCapitalization.characters,
                     validator: (String? value) =>
                         _requiredValidator(value, 'Town'),
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 12),
 
-                  // ── City (auto-filled from postcode mapping) ───────────
+                  // ── City ──────────────────────────────────────────────
                   DropdownButtonFormField<String>(
-                    value: cityOptions.contains(_selectedCity) ? _selectedCity : null,
+                    initialValue: cityOptions.contains(_selectedCity) ? _selectedCity : null,
                     decoration: _completedInputDecoration(
                       label: 'City',
                       complete: _isCityComplete,
@@ -1639,13 +1608,14 @@ class _BusinessRegistrationScreenState
                         _selectedCity = value;
                       });
                     },
-                    validator: (String? value) => _requiredValidator(value, 'City'),
+                    validator: (String? value) =>
+                        _requiredValidator(value, 'City'),
                   ),
                   const SizedBox(height: 12),
 
-                  // ── Country (auto-filled from postcode prefix) ─────────
+                  // ── Country ───────────────────────────────────────────
                   DropdownButtonFormField<String>(
-                    value: _selectedCountry,
+                    initialValue: _selectedCountry,
                     decoration: _completedInputDecoration(
                       label: 'Country',
                       complete: _isCountryComplete,

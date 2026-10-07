@@ -285,15 +285,20 @@ class _MerchantOnboardingScreenState extends State<MerchantOnboardingScreen> {
         'starterCommissionRate': startRate,  // intro rate (e.g. 10% for 90 days)
         'commissionLabel': _acceptsDelivery ? _tierLabel() : '',
         'deliveryCashbackPercent': _acceptsDelivery ? deliveryCb : 0.0,
-        'socialBoostOptIn': _acceptsDelivery && _socialBoostOptIn,
+        // Social Boost is not a delivery feature — a cafe or pub with no
+        // delivery can still take a customer's Instagram post. Fixed
+        // 22 September 2026 (SOCIAL_BOOST_PLAN.md Phase 2a): this used to be
+        // gated behind _acceptsDelivery, so every venue not doing delivery
+        // was silently written as opted out no matter what they chose here.
+        // Field renamed from 'socialBoostOptIn' to 'socialBoostEnabled' to
+        // match what the consumer app and the live partner/restaurant
+        // document actually read — signup was writing a name nothing else
+        // in the codebase ever queried.
+        'socialBoostEnabled': _socialBoostOptIn,
         'socialBoostCampaignDays':
-            _acceptsDelivery && _socialBoostOptIn
-                ? int.tryParse(_socialBoostDays) ?? 30
-                : 0,
+            _socialBoostOptIn ? int.tryParse(_socialBoostDays) ?? 30 : 0,
         'socialBoostCustomerLimit':
-            _acceptsDelivery && _socialBoostOptIn
-                ? int.tryParse(_socialBoostLimit) ?? 50
-                : 0,
+            _socialBoostOptIn ? int.tryParse(_socialBoostLimit) ?? 50 : 0,
         // Legacy field kept for backward compat
         'gooutsCommissionPercent': commRate,
 
@@ -323,7 +328,7 @@ class _MerchantOnboardingScreenState extends State<MerchantOnboardingScreen> {
         'pointsRatePercent': 1.0,
       };
 
-      await FirebaseFirestore.instance.collection('businesses').add(data);
+      await FirebaseFirestore.instance.collection('lead_partners').add(data);
 
       if (mounted) {
         _showSuccessSheet();
@@ -775,52 +780,106 @@ class _MerchantOnboardingScreenState extends State<MerchantOnboardingScreen> {
                       style: TextStyle(fontSize: 11, color: _textSecondary),
                     ),
 
-                    const SizedBox(height: 20),
+                  ],
+                  const SizedBox(height: 20),
 
-                    // ── Social Boost opt-in ──────────────────────────────────
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C3AED).withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                            color: const Color(0xFF7C3AED).withOpacity(0.2)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.auto_awesome_rounded,
-                                  color: Color(0xFF7C3AED), size: 18),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  'Social Boost',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF7C3AED),
-                                  ),
+                  // ── Social Boost opt-in ────────────────────────────────────
+                  // Moved outside the _acceptsDelivery block, and copy
+                  // rewritten, 22 September 2026 (SOCIAL_BOOST_PLAN.md Phase
+                  // 2a). This card used to live entirely inside the
+                  // delivery-only section above, so a cafe, pub or bar with
+                  // delivery switched off never even saw the toggle. The old
+                  // copy also described a flat £2.99 reward split 50/50 with
+                  // GoOuts, which was never the agreed model — see the rate
+                  // card below, which matches social_boost_config.js.
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: const Color(0xFF7C3AED).withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.auto_awesome_rounded,
+                                color: Color(0xFF7C3AED), size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Social Boost',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF7C3AED),
                                 ),
                               ),
-                              Switch(
-                                value: _socialBoostOptIn,
-                                onChanged: (v) =>
-                                    setState(() => _socialBoostOptIn = v),
-                                activeThumbColor: const Color(0xFF7C3AED),
-                              ),
-                            ],
+                            ),
+                            Switch(
+                              value: _socialBoostOptIn,
+                              onChanged: (v) =>
+                                  setState(() => _socialBoostOptIn = v),
+                              activeThumbColor: const Color(0xFF7C3AED),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'A customer pays, posts about their visit on Instagram or TikTok, and earns a Social Boost Bonus on top of their usual cashback — bigger reach, bigger bonus. You only pay the fee below for a post GoOuts has checked and confirmed still live a week later, nothing for a post that never happens.',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF7C3AED),
+                              height: 1.45),
+                        ),
+                        if (_socialBoostOptIn) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'What you pay, per verified post  ·  and the bonus it earns',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: _textPrimary),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '250-4,999 verified followers in your area  ->  £1.50  ·  1.5x cashback',
+                                  style: TextStyle(
+                                      fontSize: 11, color: _textSecondary),
+                                ),
+                                Text(
+                                  '5,000-19,999 verified followers in your area  ->  £4.00  ·  2x cashback',
+                                  style: TextStyle(
+                                      fontSize: 11, color: _textSecondary),
+                                ),
+                                Text(
+                                  '20,000+ verified followers in your area  ->  £10.00  ·  2.5x cashback',
+                                  style: TextStyle(
+                                      fontSize: 11, color: _textSecondary),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Plus VAT and a small fixed service charge. Under 250 verified followers does not qualify. You set a monthly spending ceiling below, it stops there automatically.',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: _textSecondary,
+                                      height: 1.4),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Customer pays full price → posts on Instagram → gets £2.99 delivery cashback to wallet. Cost split 50/50 with restaurant.',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF7C3AED),
-                                height: 1.45),
-                          ),
-                          if (_socialBoostOptIn) ...[
                             const SizedBox(height: 14),
                             const Text(
                               'Social Boost runs as a campaign — not permanently on. Set limits below. The merchant can adjust these anytime from their portal.',
@@ -925,7 +984,6 @@ class _MerchantOnboardingScreenState extends State<MerchantOnboardingScreen> {
                       ),
                     ),
                   ],
-                ],
               ),
             ),
             const SizedBox(height: 16),

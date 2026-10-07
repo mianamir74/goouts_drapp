@@ -9,6 +9,7 @@ import 'new_order_offer_screen.dart';
 import 'active_delivery_screen.dart';
 import 'dashboard_heatmap_screen.dart';
 import 'trip_radar_screen.dart';
+import 'rewards_home_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Reskinned 7 September 2026 to the light theme design system in
@@ -673,6 +674,44 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
                                   fontSize: 15,
                                   color: _C.navy)),
                           Text('Browse nearby available orders',
+                              style: TextStyle(color: _C.body, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: _C.muted),
+                  ]),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // ── Rewards quick access ────────────────────────────────────
+              // ⚠ ADDED 9 September 2026. RewardsHomeScreen (tiers, weekly
+              // recap, achievements, streaks, leaderboard) was fully built
+              // and wired to real Firestore reward config/leaderboard data,
+              // but had no entry point anywhere in the app — a driver could
+              // never actually reach it. This card is that entry point.
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RewardsHomeScreen()),
+                ),
+                child: _card(
+                  child: Row(children: [
+                    const Icon(Icons.emoji_events_outlined,
+                        color: _C.warning, size: 28),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Rewards',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: _C.navy)),
+                          Text('Tiers, streaks, achievements & leaderboard',
                               style: TextStyle(color: _C.body, fontSize: 12)),
                         ],
                       ),
