@@ -74,8 +74,8 @@ class RolePickerScreen extends StatelessWidget {
                             color: Colors.white)),
                   ),
                   const SizedBox(width: 10),
-                  const RichText(
-                    text: TextSpan(
+                  RichText(
+                    text: const TextSpan(
                       children: [
                         TextSpan(
                             text: 'GoOuts ',
