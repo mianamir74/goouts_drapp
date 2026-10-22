@@ -80,7 +80,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/intro/
+    # assets/intro/ removed 22 Oct 2026: not used by any screen (saves ~850 KB)
     - assets/logo/
     - assets/logo/business_code.png
     - assets/delivery/

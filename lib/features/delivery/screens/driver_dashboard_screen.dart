@@ -75,7 +75,13 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
   double _cancellationRate = 2;
   double _rating           = 4.9;
 
+  // 7 October 2026: accepting an offer no longer changes `status` (it stays
+  // the restaurant's accepted/preparing/ready until pickup), so an order this
+  // driver holds is active in any of these. See food_dispatch.js.
   static const _activeStatuses = {
+    'accepted',
+    'preparing',
+    'ready',
     'driver_heading_to_restaurant',
     'driver_picked_up',
   };
@@ -175,7 +181,10 @@ class _DriverDashboardScreenState extends State<DriverDashboardScreen> {
     _orderSub?.cancel(); // guard against double-subscribing
     _orderSub = _db
         .collection('food_orders')
-        .where('status', isEqualTo: 'pending')
+        // 7 October 2026: offered once the RESTAURANT has accepted (was
+        // 'pending'). Must stay in step with firestore.rules' read rule and
+        // DRIVER_OFFERABLE_STATUSES in food_dispatch.js.
+        .where('status', whereIn: const ['accepted', 'preparing', 'ready'])
         .where('driverId', isEqualTo: null)
         .limit(20)
         .snapshots()

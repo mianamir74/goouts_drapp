@@ -152,7 +152,7 @@ class _MerchantInviteScreenState extends State<MerchantInviteScreen> {
     final String safeBusiness = businessName.trim().isEmpty ? 'your business' : businessName.trim();
     return "Hi $safeContact,\n\n"
         "I'm a GoOuts delivery driver and I'd like to invite $safeBusiness to join GoOuts as a cashback partner.\n\n"
-        "GoOuts customers pay with their GoOuts card at partner restaurants, pubs, cafes and shops and earn cashback automatically, "
+        "GoOuts customers pay with their GoOuts card at partner restaurants, pubs, cafes, brands and many more, and earn cashback automatically, "
         "bringing you more footfall from a network that's already looking for places like yours.\n\n"
         "Please enter this referral code when you sign up:\n\n"
         "$referralCode\n\n"

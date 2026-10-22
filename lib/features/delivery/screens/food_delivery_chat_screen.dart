@@ -110,7 +110,15 @@ class _FoodDeliveryChatScreenState extends State<FoodDeliveryChatScreen> {
   }
 
   bool _computeChatOpen(String status, DateTime? deliveredAt) {
-    const active = ['driver_heading_to_restaurant', 'driver_picked_up'];
+    // 7 October 2026: this is the DRIVER's chat, so the order is already
+    // theirs; it is live from the restaurant's accepted state onward.
+    const active = [
+      'accepted',
+      'preparing',
+      'ready',
+      'driver_heading_to_restaurant',
+      'driver_picked_up',
+    ];
     if (active.contains(status)) return true;
     if (status == 'delivered' && deliveredAt != null) {
       return DateTime.now().isBefore(deliveredAt.add(const Duration(minutes: 30)));

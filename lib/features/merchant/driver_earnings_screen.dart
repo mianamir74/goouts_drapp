@@ -38,7 +38,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       'label': 'Tier 1',
       'min': 1,
       'max': 5,
-      'commission': 3.0,
+      'commission': 2.0,
       'color': Color(0xFF0392CA),
       'icon': Icons.emoji_events_outlined,
     },
@@ -47,7 +47,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       'label': 'Tier 2',
       'min': 6,
       'max': 10,
-      'commission': 4.0,
+      'commission': 3.0,
       'color': Color(0xFF7C3AED),
       'icon': Icons.workspace_premium_outlined,
     },
@@ -249,7 +249,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'You earn ${(_currentTier()['commission'] as double).toStringAsFixed(0)}% of GoOuts\' monthly profit from each business you sign up.',
+                      'You earn ${(_currentTier()['commission'] as double).toStringAsFixed(0)}% of GoOuts\' net profit (after cashback rewards) from each business you sign up.',
                       style: const TextStyle(
                         fontSize: 13,
                         color: _textSecondary,
@@ -405,7 +405,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                   Icon(Icons.star_rounded, color: _amber, size: 16),
                   SizedBox(width: 6),
                   Text(
-                    'Maximum tier reached — 5% forever',
+                    'Top tier reached: 5% for up to 2 years per referral',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.white,

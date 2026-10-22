@@ -38,7 +38,16 @@ class ActiveDeliveryMiniBar extends StatefulWidget {
 }
 
 class _ActiveDeliveryMiniBarState extends State<ActiveDeliveryMiniBar> {
-  static const _activeStatuses = ['driver_heading_to_restaurant', 'driver_picked_up'];
+  // 7 October 2026: accepting an offer no longer changes `status` (it stays
+  // the restaurant's accepted/preparing/ready until pickup), so an order this
+  // driver holds is active in any of these. See food_dispatch.js.
+  static const _activeStatuses = [
+    'accepted',
+    'preparing',
+    'ready',
+    'driver_heading_to_restaurant',
+    'driver_picked_up',
+  ];
 
   Map<String, dynamic>? _order;
   bool _loading = true;
