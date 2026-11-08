@@ -230,7 +230,7 @@ class FaqScreen extends StatelessWidget {
       question: 'How is residual income worked out?',
       answer:
           'You earn a percentage of the BASE FARE earnings of each driver you '
-          'refer, and a percentage of the NET PROFIT GoOuts makes from each venue '
+          'refer, and a percentage of the NET COMMISSION GoOuts keeps from each venue '
           'you introduce (GoOuts commission minus the cashback rewards given to '
           'customers). GoOuts pays it from its own share, so nothing is ever taken '
           'from the driver or the venue. The same rules apply to drivers and to '
@@ -283,7 +283,7 @@ class FaqScreen extends StatelessWidget {
           '£4.00, at 3 percent £6.00, at 5 percent £10.00.\n\n'
           'Venue example: a customer orders £40 of food from a venue you '
           'introduced. GoOuts commission at 15 percent is £6.00 and the customer '
-          'gets £2.00 cashback rewards, so GoOuts net profit is £4.00. At '
+          'gets £2.00 cashback rewards, so GoOuts net commission is £4.00. At '
           '2 percent you earn £0.08, at 3 percent £0.12, at 5 percent £0.20. '
           '1,000 such orders a month at 5 percent would earn you £200.',
     ),

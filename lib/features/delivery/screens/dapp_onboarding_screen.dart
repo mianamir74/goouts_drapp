@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../widgets/goouts_logo.dart';
 import 'dapp_login_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,20 +99,7 @@ class _DappOnboardingScreenState extends State<DappOnboardingScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: _C.primary,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text('G',
-                            style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white)),
-                      ),
+                      const GoOutsLogo(size: 36),
                       const SizedBox(width: 10),
                       RichText(
                         text: const TextSpan(

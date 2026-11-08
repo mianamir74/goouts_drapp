@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../features/auth/auth_service.dart';
 import 'dapp_otp_screen.dart';
+import '../../../widgets/goouts_logo.dart';
 import 'dapp_registration_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,26 +116,7 @@ class _DappLoginScreenState extends State<DappLoginScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _C.primary,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                            color: _C.primary.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3)),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text('G',
-                        style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white)),
-                  ),
+                  const GoOutsLogo(size: 44),
                   const SizedBox(width: 10),
                   RichText(
                     text: const TextSpan(

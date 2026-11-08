@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../features/auth/auth_service.dart';
 import 'main_delivery_scaffold.dart';
+import '../../../widgets/goouts_logo.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,15 +214,7 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: _C.paleTint,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(Icons.sms_outlined, size: 40, color: _C.primary),
-              ),
+              const GoOutsLogo(size: 76),
               const SizedBox(height: 24),
               const Text('Enter Verification Code',
                   style: TextStyle(
@@ -255,7 +248,7 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
               // OTP boxes card
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 decoration: BoxDecoration(
                   color: _C.surface,
                   borderRadius: BorderRadius.circular(16),
@@ -268,8 +261,12 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
                 ),
                 child: AutofillGroup(
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: List.generate(6, (i) => _otpBox(i)),
+                    children: [
+                      for (var i = 0; i < 6; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(child: _otpBox(i)),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -400,8 +397,7 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
 
   Widget _otpBox(int i) {
     return SizedBox(
-      width: 46,
-      height: 54,
+      height: 60,
       child: KeyboardListener(
         focusNode: _keyEventFocus[i],
         onKeyEvent: (event) {
@@ -415,17 +411,26 @@ class _DappOtpScreenState extends State<DappOtpScreen> {
         controller: _ctrl[i],
         focusNode: _focus[i],
         textAlign: TextAlign.center,
+        textAlignVertical: TextAlignVertical.center,
+        expands: true,
+        maxLines: null,
+        showCursor: true,
+        cursorHeight: 24,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         // box 0 accepts 6 chars so SMS autofill / paste can insert the full
         // code at once; _fillFromString then distributes it across all boxes
         maxLength: i == 0 ? 6 : 1,
         autofillHints: i == 0 ? const [AutofillHints.oneTimeCode] : null,
         keyboardType: TextInputType.number,
         style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+            fontSize: 24,
+            height: 1.0,
+            fontWeight: FontWeight.w800,
             color: _C.navy),
         decoration: InputDecoration(
           counterText: '',
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
           filled: true,
           fillColor: const Color(0xFFEFF5FD),
           border: OutlineInputBorder(

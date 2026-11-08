@@ -249,7 +249,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'You earn ${(_currentTier()['commission'] as double).toStringAsFixed(0)}% of GoOuts\' net profit (after cashback rewards) from each business you sign up.',
+                      'You earn ${(_currentTier()['commission'] as double).toStringAsFixed(0)}% of GoOuts\' net commission (after cashback rewards) from each business you sign up.',
                       style: const TextStyle(
                         fontSize: 13,
                         color: _textSecondary,
@@ -349,7 +349,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'of GoOuts profit from each referred business',
+            'of GoOuts net commission from each referred business',
             style: TextStyle(
               fontSize: 13,
               color: Colors.white70,
@@ -809,9 +809,9 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           _howStep('3',
               'GoOuts users pay at that business and earn cashback.'),
           _howStep('4',
-              'At month end, GoOuts calculates profit from that business.'),
+              'GoOuts works out its net commission from that business (commission minus cashback rewards).'),
           _howStep('5',
-              'You earn ${(_currentTier()['commission'] as double).toStringAsFixed(0)}% of that profit — every month, forever.'),
+              'You earn ${(_currentTier()['commission'] as double).toStringAsFixed(0)}% of that net commission, for up to 2 years.'),
           const SizedBox(height: 4),
           Text(
             'Sign up more businesses to reach Tier 2 (4%) and Tier 3 (5%).',

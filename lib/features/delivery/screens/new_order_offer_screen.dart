@@ -133,7 +133,7 @@ class _NewOrderOfferScreenState extends State<NewOrderOfferScreen> {
     FirebaseFunctions.instanceFor(region: 'europe-west1')
         .httpsCallable('declineFoodOrder')
         .call({'orderId': widget.order['id']})
-        .catchError((_) {});
+        .then((_) {}, onError: (_) {});
     if (!mounted) return;
     Navigator.pop(context);
   }

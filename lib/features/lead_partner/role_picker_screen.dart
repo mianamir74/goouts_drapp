@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../delivery/screens/dapp_onboarding_screen.dart';
+import '../../widgets/goouts_logo.dart';
 import 'auth/login_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,20 +60,7 @@ class RolePickerScreen extends StatelessWidget {
                   // ⚠ 16 September 2026, requested directly: logo reduced
                   // 20% (36→29, 22→17.6) to free vertical room so the whole
                   // screen fits in one mobile canvas without scrolling.
-                  Container(
-                    width: 29,
-                    height: 29,
-                    decoration: BoxDecoration(
-                      color: _C.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text('G',
-                        style: TextStyle(
-                            fontSize: 17.6,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white)),
-                  ),
+                  const GoOutsLogo(size: 29),
                   const SizedBox(width: 10),
                   RichText(
                     text: const TextSpan(

@@ -350,7 +350,7 @@ class _TermsContent extends StatelessWidget {
           'rewards are excluded.',
         ),
         _bullet(
-          'Venue referrals: a percentage of the net profit GoOuts makes on '
+          'Venue referrals: a percentage of the net commission GoOuts keeps on '
           'the venue\u2019s orders, meaning GoOuts commission minus the '
           'cashback rewards given to customers.',
         ),
