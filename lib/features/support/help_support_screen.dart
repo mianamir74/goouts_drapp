@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'support_ticket_chat_screen.dart';
 import 'my_tickets_screen.dart';
+import 'help_assistant_screen.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
 
 // ── Category & sub-topic data ─────────────────────────────────────────────────
@@ -514,6 +515,47 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+
+                    // ── Help Assistant (instant answers) ────────────────────
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => HelpAssistantScreen(
+                          app: widget.accountType == 'business' ? 'business' : 'driver',
+                          onOpenTickets: () => Navigator.pushReplacement(context,
+                            MaterialPageRoute(builder: (_) => MyTicketsScreen(
+                              sourceCollection: widget.collectionName,
+                              driverName: 'Driver',
+                            ))),
+                        ),
+                      )),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _goOutsBlue.withValues(alpha: 0.35)),
+                        ),
+                        child: const Row(children: [
+                          Icon(Icons.support_agent_rounded, color: _goOutsBlue, size: 24),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Ask GoOuts Help',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                                        color: _textPrimary)),
+                                SizedBox(height: 2),
+                                Text('Instant answers, any time. A person can take over if needed.',
+                                    style: TextStyle(fontSize: 12, color: Color(0xFF60717D), height: 1.3)),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: _goOutsBlue),
+                        ]),
+                      ),
+                    ),
 
                     // ── My Tickets banner ───────────────────────────────────
                     GestureDetector(
