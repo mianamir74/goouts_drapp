@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -56,7 +55,6 @@ class DeliveryVerificationScreen extends StatefulWidget {
 class _DeliveryVerificationScreenState
     extends State<DeliveryVerificationScreen> {
   final _picker  = ImagePicker();
-  final _db      = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
 
   XFile? _photo;
@@ -75,12 +73,11 @@ class _DeliveryVerificationScreenState
       final ref = _storage.ref('orders/${widget.orderId}/proof_of_delivery.jpg');
       await ref.putFile(File(_photo!.path));
       final url = await ref.getDownloadURL();
-      await _db.collection('food_orders').doc(widget.orderId).set(
-        {'proofOfDeliveryUrl': url},
-        SetOptions(merge: true),
-      );
+      // 13 Nov 2026: the URL goes back to ActiveDeliveryScreen, which sends
+      // it to completeFoodDelivery. Writing to food_orders from the app is
+      // refused by firestore.rules.
       if (!mounted) return;
-      Navigator.pop(context, true);
+      Navigator.pop(context, url);
     } catch (e) {
       if (!mounted) return;
       setState(() => _confirming = false);

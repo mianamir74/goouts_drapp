@@ -12,6 +12,7 @@ import 'package:mobile_scanner/mobile_scanner.dart' hide GeoPoint;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/location_broadcast_service.dart';
+import 'alcohol_check_screen.dart';
 import 'delivery_verification_screen.dart';
 import 'food_delivery_chat_screen.dart';
 import 'package:goouts_drapp/features/common/goouts_sheet.dart';
@@ -209,20 +210,42 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen> {
   }
 
   Future<void> _markDelivered() async {
-    final confirmed = await Navigator.push<bool>(
+    // 13 Nov 2026: orders with alcohol need the Challenge 25 check first.
+    Map<String, dynamic>? alcoholCheck;
+    if (_order?['hasAlcohol'] == true) {
+      alcoholCheck = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(builder: (_) => const AlcoholCheckScreen()),
+      );
+      if (alcoholCheck == null || !mounted) return;
+    }
+    final url = await Navigator.push<String>(
       context,
       MaterialPageRoute(
         builder: (_) => DeliveryVerificationScreen(orderId: widget.orderId),
       ),
     );
-    if (confirmed != true) return;
+    if (url == null || url.isEmpty || !mounted) return;
     try {
-      await _db.collection('food_orders').doc(widget.orderId).update({
-        'status': 'delivered',
-        'deliveredAt': FieldValue.serverTimestamp(),
+      final res = await FirebaseFunctions.instanceFor(region: 'europe-west1')
+          .httpsCallable('completeFoodDelivery')
+          .call<Map<String, dynamic>>({
+        'orderId': widget.orderId,
+        'proofOfDeliveryUrl': url,
+        if (alcoholCheck != null) 'alcoholCheck': alcoholCheck,
       });
       // Stop broadcasting location once delivered
       await _loc.stop();
+      if (!mounted) return;
+      if (res.data['alcoholRefused'] == true) {
+        GoOutsSheet.info(context,
+            title: 'Food delivered',
+            message: 'The alcohol was not handed over. Please take it back to the restaurant.');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      GoOutsSheet.error(context, title: 'Delivery Failed',
+          message: e.message ?? 'Failed to confirm delivery. Please try again.');
     } catch (e) {
       if (!mounted) return;
       GoOutsSheet.error(context, title: 'Delivery Failed', message: 'Failed to confirm delivery. Check your connection.',

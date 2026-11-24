@@ -1,0 +1,68 @@
+Run flutter build ipa \
+Archiving com.goouts.driver...
+Adding Swift Package Manager integration...                     
+Xcode is fetching Swift Package Manager dependencies. This may take several minutes...
+Adding Swift Package Manager integration...                        80.8s
+The following plugins do not support Swift Package Manager for ios:
+  - gallery_saver_plus
+  - google_maps_flutter_ios
+  - google_mlkit_commons
+  - google_mlkit_face_detection
+  - permission_handler_apple
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running pod install...                                             14.9s
+Running Xcode build...                                          
+Xcode archive done.                                         204.5s
+Failed to build iOS app
+Error output from Xcode build:
+↳
+    ** ARCHIVE FAILED **
+
+
+Xcode's output:
+↳
+    Writing result bundle at path:
+    	/var/folders/df/djsxfhc17x95674wsm_g8s980000gn/T/flutter_tools.DTEVLL/flutter_ios_build_temp_dir1ek1ge/temporary_xcresult_bundle
+
+    /Users/runner/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/ios/Classes/strategies/PhonePermissionStrategy.m:49:35: warning: 'subscriberCellularProvider' is deprecated: first deprecated in iOS 12.0 [-Wdeprecated-declarations]
+       49 |     CTCarrier *carrier = [netInfo subscriberCellularProvider];
+          |                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~
+          |                                   serviceSubscriberCellularProviders
+    In module 'CoreTelephony' imported from /Users/runner/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/ios/Classes/strategies/PhonePermissionStrategy.m:8:
+    /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/CoreTelephony.framework/Headers/CTTelephonyNetworkInfo.h:114:50: note: property 'subscriberCellularProvider' is declared deprecated here
+      114 | @property(readonly, retain, nullable) CTCarrier *subscriberCellularProvider API_DEPRECATED_WITH_REPLACEMENT("serviceSubscriberCellularProviders", ios(4.0, 12.0)) API_UNAVAILABLE(macos);
+          |                                                  ^
+    /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/CoreTelephony.framework/Headers/CTTelephonyNetworkInfo.h:114:50: note: 'subscriberCellularProvider' has been explicitly marked deprecated here
+    1 warning generated.
+    In file included from /Users/runner/.pub-cache/hosted/pub.dev/google_mlkit_commons-0.11.1/ios/Classes/GoogleMlKitCommonsPlugin.m:1:
+    /Users/runner/.pub-cache/hosted/pub.dev/google_mlkit_commons-0.11.1/ios/Classes/GoogleMlKitCommonsPlugin.h:12:22: warning: unused function 'getFlutterError' [-Wunused-function]
+       12 | static FlutterError *getFlutterError(NSError *error) {
+          |                      ^~~~~~~~~~~~~~~
+    1 warning generated.
+    /Users/runner/.pub-cache/hosted/pub.dev/google_mlkit_commons-0.11.1/ios/Classes/MLKVisionImage+FlutterPlugin.m:98:81: warning: bitwise operation between different enumeration types ('enum CGImageAlphaInfo' and 'enum CGBitmapInfo') [-Wenum-enum-conversion]
+       98 |                                                  kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+          |                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~~~~~~~~~
+    In file included from /Users/runner/.pub-cache/hosted/pub.dev/google_mlkit_commons-0.11.1/ios/Classes/MLKVisionImage+FlutterPlugin.m:1:
+    /Users/runner/.pub-cache/hosted/pub.dev/google_mlkit_commons-0.11.1/ios/Classes/GoogleMlKitCommonsPlugin.h:12:22: warning: unused function 'getFlutterError' [-Wunused-function]
+       12 | static FlutterError *getFlutterError(NSError *error) {
+          |                      ^~~~~~~~~~~~~~~
+    2 warnings generated.
+    /Users/runner/work/goouts_drapp/goouts_drapp/ios/Pods/Pods.xcodeproj: gallery_saver_plus: ld: warning: search path '/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.1FfioY/Metal.xctoolchain/usr/lib/swift/iphoneos' not found
+    /Users/runner/work/goouts_drapp/goouts_drapp/ios/Pods/Google-Maps-iOS-Utils/Sources/GoogleMapsUtilsObjC/include/GMUHeatmapTileLayer.m:345:78: warning: bitwise operation between different enumeration types ('enum CGBitmapInfo' and 'enum CGImageAlphaInfo') [-Wenum-enum-conversion]
+      345 |                                       colorSpaceRef, kCGBitmapByteOrder32Big | kCGImageAlphaLast,
+          |                                                      ~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~~~
+    1 warning generated.
+    /Users/runner/.pub-cache/hosted/pub.dev/google_maps_flutter_ios-2.18.4/ios/google_maps_flutter_ios/Sources/google_maps_flutter_ios/FGMTileOverlayController.m:93:55: warning: bitwise operation between different enumeration types ('enum CGBitmapInfo' and 'enum CGImageAlphaInfo') [-Wenum-enum-conversion]
+       93 |                               (kCGBitmapAlphaInfoMask & kCGImageAlphaPremultipliedLast));
+          |                                ~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    1 warning generated.
+    libtool: warning: 'MLKVisionImage+FlutterPlugin.o' has no symbols
+    Error: unable to locate asset entry in pubspec.yaml: "assets".
+    Target release_ios_bundle_flutter_assets failed: Exception: Failed to bundle asset files.
+    Failed to package /Users/runner/work/goouts_drapp/goouts_drapp.
+    Command PhaseScriptExecution failed with a nonzero exit code
+    note: Run script build phase 'Run Script' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+    note: Run script build phase 'Thin Binary' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+
+Encountered error while archiving for device.
+Error: Process completed with exit code 1.
